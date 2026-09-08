@@ -1,0 +1,25 @@
+/* Injected into the plan's iframe, so these selectors run against the
+   plan's own markup — not the reviewer's. */
+
+mark[data-comment] {
+  background: #ffe9a8;
+  color: #1c1c1a;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px #e8cd80;
+  cursor: pointer;
+}
+mark[data-comment].active {
+  background: #ffd45e;
+  box-shadow: 0 0 0 2px #d9a72e;
+}
+@media (prefers-color-scheme: dark) {
+  mark[data-comment] {
+    background: #7a6524;
+    color: #f4efe0;
+    box-shadow: none;
+  }
+  mark[data-comment].active {
+    background: #a8862c;
+    box-shadow: none;
+  }
+}

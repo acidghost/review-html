@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Plan reviewer</title>
+    <link rel="stylesheet" href="app/review.css">
+  </head>
+  <body>
+    <header>
+      <strong id="name">Plan reviewer</strong>
+      <span id="count" class="muted"></span>
+      <span id="note" class="muted"></span>
+      <span class="spacer"></span>
+      <button type="button" id="openBtn">Open…</button>
+      <button type="button" id="jsonBtn" disabled>Save .json</button>
+      <button type="button" id="exportBtn" disabled>Copy Markdown</button>
+    </header>
+
+    <main>
+      <div id="planpane">
+        <iframe id="plan" sandbox="allow-same-origin" title="Plan"></iframe>
+        <div id="empty">
+          <b>Drop a plan HTML file here</b>
+          <span
+            >or open it by path with <code>just review &lt;plan&gt;</code></span
+          >
+        </div>
+      </div>
+      <aside>
+        <p id="none" class="muted">No comments yet.</p>
+        <div id="cards"></div>
+      </aside>
+    </main>
+
+    <button type="button" id="add" hidden>Add comment</button>
+
+    <div id="overlay" hidden>
+      <div id="sheet">
+        <div class="row">
+          <strong>Review Markdown</strong>
+          <span id="status" class="muted"></span>
+          <span class="spacer"></span>
+          <button type="button" id="mdBtn">Save .md</button>
+          <button type="button" id="closeBtn">Close</button>
+        </div>
+        <textarea id="md" spellcheck="false"></textarea>
+      </div>
+    </div>
+
+    <div id="drop" hidden>Drop to open</div>
+    <input
+      id="file"
+      type="file"
+      accept=".html,.json,text/html,application/json"
+      hidden
+    >
+
+    <script type="module" src="app/main.js"></script>
+  </body>
+</html>

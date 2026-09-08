@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fixture plan</title>
+    <style>
+      :root {
+        --bg: #fdfdfc;
+        --fg: #1c1c1a;
+        --muted: #6b6b66;
+        --rule: #e2e2dd;
+        --accent: #2f5fa8;
+        --code-bg: #f2f2ee;
+        --page: 46rem;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #16161a;
+          --fg: #e6e6e1;
+          --muted: #9a9a93;
+          --rule: #2e2e34;
+          --accent: #8ab4f8;
+          --code-bg: #222229;
+        }
+      }
+      body {
+        background: var(--bg);
+        color: var(--fg);
+        font: 17px/1.65 ui-serif, Georgia, serif;
+        margin: 0 auto;
+        padding: 3rem 1.25rem 6rem;
+        max-width: var(--page);
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        line-height: 1.25;
+        margin: 2.5rem 0 0.75rem;
+      }
+      h1 {
+        font-size: 1.9rem;
+        margin-top: 0;
+      }
+      h2 {
+        font-size: 1.3rem;
+        border-bottom: 1px solid var(--rule);
+        padding-bottom: 0.3rem;
+      }
+      h3 {
+        font-size: 1.05rem;
+        color: var(--muted);
+      }
+      .meta {
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        font-size: 0.85rem;
+        color: var(--muted);
+        margin-bottom: 2rem;
+      }
+      li {
+        margin: 0.35rem 0;
+      }
+      code,
+      pre {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.85em;
+        background: var(--code-bg);
+      }
+      code {
+        padding: 0.1em 0.35em;
+        border-radius: 3px;
+      }
+      pre {
+        padding: 0.9rem 1rem;
+        border-radius: 6px;
+        overflow-x: auto;
+      }
+      pre code {
+        padding: 0;
+        background: none;
+      }
+      blockquote {
+        margin: 1.2rem 0;
+        padding: 0.2rem 0 0.2rem 1rem;
+        border-left: 3px solid var(--accent);
+        color: var(--muted);
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 0.9rem;
+        display: block;
+        overflow-x: auto;
+      }
+      th,
+      td {
+        border-bottom: 1px solid var(--rule);
+        padding: 0.5rem 0.6rem;
+        text-align: left;
+      }
+      a {
+        color: var(--accent);
+      }
+
+      /* page-width slider */
+      #width {
+        position: fixed;
+        top: 0.6rem;
+        right: 0.8rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font: 0.75rem ui-sans-serif, system-ui, sans-serif;
+        color: var(--muted);
+        background: var(--bg);
+        border: 1px solid var(--rule);
+        border-radius: 999px;
+        padding: 0.3rem 0.7rem;
+        opacity: 0.35;
+        transition: opacity 0.15s;
+      }
+      #width:hover,
+      #width:focus-within {
+        opacity: 1;
+      }
+      #width input {
+        width: 7rem;
+        accent-color: var(--accent);
+      }
+      @media print {
+        #width {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <label id="width" title="Page width">
+      width
+      <input type="range" min="36" max="110" step="2" value="46" />
+    </label>
+    <script>
+      (() => {
+        const input = document.querySelector("#width input");
+        const apply = (rem) =>
+          document.documentElement.style.setProperty("--page", rem + "rem");
+        try {
+          const saved = localStorage.getItem("plan-width");
+          if (saved) {
+            input.value = saved;
+            apply(saved);
+          }
+        } catch {} // file:// origins may block localStorage
+        input.addEventListener("input", () => {
+          apply(input.value);
+          try {
+            localStorage.setItem("plan-width", input.value);
+          } catch {}
+        });
+      })();
+    </script>
+
+    <h1>Fixture plan</h1>
+    <p class="meta">2026-09-08 · review-html / main</p>
+
+    <h2>Goal</h2>
+    <p>
+      Exercise the reviewer against the real plan template: nested headings, a
+      paragraph long enough to select a phrase from the middle of, a code block,
+      and a table.
+    </p>
+
+    <h2>Context</h2>
+    <ul>
+      <li>The first list item, which spans a single text node.</li>
+      <li>A second item with <code>inline code</code> inside it.</li>
+    </ul>
+
+    <h2>Steps</h2>
+    <h3>1. Parse the input</h3>
+    <p>
+      This sentence exists so a selection can start in the middle of it and end
+      in the middle of the next paragraph, which is the case that produces
+      several marks for one comment.
+    </p>
+    <p>
+      A second paragraph under the same heading, to be the far end of that
+      cross-element selection.
+    </p>
+
+    <h3>2. Emit the output</h3>
+    <pre><code>const answer = 42;
+console.log(answer);</code></pre>
+
+    <h2>Verification</h2>
+    <table>
+      <thead>
+        <tr><th>Check</th><th>Expected</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Highlight painted</td><td>One mark per text node touched</td></tr>
+        <tr><td>Section breadcrumb</td><td><code>Steps › 1. Parse the input</code></td></tr>
+      </tbody>
+    </table>
+  </body>
+</html>

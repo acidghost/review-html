@@ -1,0 +1,271 @@
+/* Reviewer chrome. The plan's own CSS lives in its iframe and cannot reach
+   any of this; plan.css is what gets injected in there. */
+
+:root {
+  --bg: #fdfdfc;
+  --panel: #f4f4f0;
+  --fg: #1c1c1a;
+  --muted: #6b6b66;
+  --rule: #e2e2dd;
+  --accent: #2f5fa8;
+  --mark: #ffe9a8;
+  --warn: #a8622f;
+  --sidebar: 24rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16161a;
+    --panel: #1d1d22;
+    --fg: #e6e6e1;
+    --muted: #9a9a93;
+    --rule: #2e2e34;
+    --accent: #8ab4f8;
+    --mark: #6b5a1e;
+    --warn: #d99a6c;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  font:
+    14px / 1.5 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.9rem;
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel);
+}
+.spacer {
+  flex: 1;
+}
+.muted {
+  color: var(--muted);
+}
+button {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 5px;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+#planpane {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+#plan {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: var(--bg);
+}
+#empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  color: var(--muted);
+  background: var(--bg);
+  text-align: center;
+}
+#empty b {
+  font-size: 1.05rem;
+  color: var(--fg);
+  font-weight: 600;
+}
+
+aside {
+  width: var(--sidebar);
+  border-left: 1px solid var(--rule);
+  background: var(--panel);
+  overflow-y: auto;
+  padding: 0.75rem;
+}
+.card {
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 0.6rem 0.7rem;
+  margin-bottom: 0.6rem;
+}
+.card.active {
+  border-color: var(--accent);
+}
+.card .top {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+}
+.card .sec {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.card .del {
+  flex: none;
+  padding: 0 0.35rem;
+  line-height: 1.2;
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+}
+.card .del:hover {
+  color: var(--warn);
+  border-color: var(--rule);
+}
+.card blockquote {
+  cursor: pointer; /* clicking a card jumps to its highlight */
+  margin: 0 0 0.5rem;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--mark);
+  font:
+    italic 0.85rem / 1.45 ui-serif,
+    Georgia,
+    serif;
+  color: var(--muted);
+}
+.card textarea {
+  width: 100%;
+  min-height: 4.5rem;
+  resize: vertical;
+  font: inherit;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.4rem;
+}
+.card textarea:focus {
+  outline: 1px solid var(--accent);
+  border-color: var(--accent);
+}
+
+.card.orphan {
+  border-color: var(--warn);
+}
+.card .tag {
+  flex: none;
+  font-size: 0.7rem;
+  color: var(--warn);
+  letter-spacing: 0.02em;
+}
+#note {
+  font-size: 0.8rem;
+}
+#name {
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+}
+
+#add {
+  position: fixed;
+  z-index: 5;
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+}
+#add:hover {
+  color: #fff;
+}
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgb(0 0 0 / 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#sheet {
+  width: min(46rem, 92vw);
+  height: min(34rem, 82vh);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 0.9rem;
+}
+#sheet .row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+#md {
+  flex: 1;
+  font:
+    12px / 1.5 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.6rem;
+  resize: none;
+  white-space: pre;
+  overflow: auto;
+}
+
+#drop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: var(--accent);
+  background: rgb(47 95 168 / 0.12);
+  outline: 3px dashed var(--accent);
+  outline-offset: -12px;
+  pointer-events: none;
+}
+[hidden] {
+  /* biome-ignore lint/complexity/noImportantStyles: beats the id selectors above */
+  display: none !important;
+}
