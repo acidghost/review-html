@@ -101,8 +101,9 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
   let origin;
 
   beforeAll(() => {
-    // Port 0: a fixed one would collide with a `just review` left running.
-    server = serve({ app: ROOT, root: ROOT, port: 0 });
+    // Port 0: a fixed one would collide with a server left running.
+    // The fixture is handed over directly, since /_open is the CLI's job.
+    server = serve({ app: ROOT, port: 0, allow: new Set([PLAN]) });
     origin = server.url.origin;
   });
 

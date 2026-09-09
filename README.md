@@ -4,10 +4,11 @@ Read a Claude Code plan, attach inline comments to highlighted text, export them
 as Markdown to forward back to Claude.
 
 No build step to develop: the browser asks for one ES module per file, and
-`server.ts` takes the types off each on the way out. Nothing is written to disk
-and every import specifier reaches the browser as written — so the sources
-under `app/` are what runs. `just bundle` is the one exception, and what it
-writes lands in `dist/`.
+`server.ts` takes the types off each on the way out — so the sources under
+`app/` are what runs, with every import specifier reaching the browser as
+written. The two builds are for shipping, and everything they write lands in
+`dist/`: `just bundle` for the single page, `just build` for the binary that
+embeds it.
 
 Nothing ships as a dependency either. Three arrive for development:
 `typescript` and `@types/bun` for `just typecheck`, and `playwright` for the
@@ -19,26 +20,51 @@ plus `just` and `biome`. Everything else is a `bun install` away.
 
 ## Use
 
-    just review ~/path/to/repo/.plans/2026-09-08-thing.html
+    just install
+    review-html ~/path/to/repo/.plans/2026-09-08-thing.html
 
-Starts a loopback server and opens the reviewer pointed at that plan. Select
-text, *Add comment*, type; comments save themselves. *Copy Markdown* puts the
-export on the clipboard, *Save .md* writes `<plan>.review.md`.
+One compiled binary on `$PATH`, run from any directory. It starts a loopback
+server if none is listening, hands it that plan, and opens the reviewer on it.
+Select text, *Add comment*, type; comments save themselves. *Copy Markdown*
+puts the export on the clipboard, *Save .md* writes `<plan>.review.md`.
 
-The reviewer and the plans are two namespaces. The reviewer comes off this
-checkout at a fixed `/review.html`; plans are read by absolute path through
-`/plan`, bounded by a root of their own — your work area by default. Plans
-outside it are refused, and only `.html` is served: anything readable under
-that root is one loopback GET away, which is why it is not `$HOME`. Set
-`REVIEW_ROOT` to move the boundary.
+    review-html          the reviewer with no plan, ready for a dropped file
+    review-html serve    run the server in the foreground
+    review-html stop     stop it
+    review-html status   what is running, and which plans it will serve
 
-The recipe is a single call to `server.ts --open`, which resolves the plan,
-reuses a server already listening on the port, and starts a detached one only
-if there is none. So `just review` is safe to run repeatedly.
+Subcommands win the bare word, so a plan named `serve` is reachable as
+`./serve`. The port is fixed at 8422: saved reviews are keyed to the origin,
+and the port is part of that, so a review made on one port would not be found
+on another.
 
-`just open` starts the same server with no plan loaded, ready for a dropped
-file — everything works except the plan's path, which the browser withholds, so
-a review is then keyed on the filename alone. `just stop` shuts the server down.
+`just review`, `just serve`, `just stop` and `just status` are the same
+commands against the working copy, which is what to use while changing this.
+
+### What the server will read
+
+The server serves nothing it was not handed. `review-html <plan>` resolves the
+path itself — it has your files and your `cwd`, the server needs neither — and
+registers that one file; `/plan?path=…` refuses everything else. So a plan may
+live anywhere, and `~/.ssh/id_rsa` is refused because nobody opened it as a
+plan.
+
+Registering is the one write, so it is the one thing authenticated: `POST
+/_open` wants a token from `~/.cache/review-html/state.json`, which is `0600`
+in a `0700` directory. A local process can read that; a web page cannot, and
+sending it in a header of our own also puts the request behind a preflight
+that goes unanswered.
+
+Be precise about who that stops. A malicious page you visit can *send* a
+request to `127.0.0.1:8422`, but with no `Access-Control-Allow-Origin` coming
+back it cannot read the response — the same-origin policy does that work. The
+allowlist is what stops a *local* reader: any other process on the machine can
+curl loopback and read whatever it is given, and CORS has nothing to say about
+that.
+
+The allowlist is in memory, so restarting the server empties it and a stale
+tab's reload gets a 403 saying so. Set `REVIEW_ROOT` for a hard ceiling on
+what may be registered at all; unset, the allowlist is the whole boundary.
 
 ### One file, no server
 
@@ -47,7 +73,7 @@ a review is then keyed on the filename alone. `just stop` shuts the server down.
 `dist/review.html` is the whole reviewer — modules and both stylesheets
 inlined — so it opens from Finder. Drop a plan in and everything works except
 loading one by path, which a `file://` page cannot do; a review is then keyed
-on the filename alone, the same trade `just open` makes.
+on the filename alone, the same trade `review-html` with no plan makes.
 
 The sources say `<script type="module" src=…>`, which does not load over
 `file://`. The bundle has no `src` to fetch, which is the whole of the trick.
@@ -74,8 +100,11 @@ and paint highlights.
 | `app/frame.ts`  | painting and measuring inside the plan's iframe     |
 | `app/store.ts`  | `localStorage`, keyed by the plan's path            |
 | `app/*.css`     | reviewer chrome, and what is injected into plans    |
-| `server.ts`     | serves, transpiles, and builds the URL to open       |
+| `server.ts`     | routes, the transpile, and the allowlist             |
+| `cli.ts`        | the commands, and the URL to open                   |
+| `state.ts`      | pid, port and token, at `0600`                      |
 | `bundle.ts`     | the same app as one file                            |
+| `binary.ts`     | the compile entrypoint: `cli.ts` plus that file     |
 
 `frame.ts` takes the plan's `document` as an argument and `store.ts` takes the
 storage object, so neither reaches for a global — which is what makes them
@@ -85,12 +114,18 @@ testable. `anchor.ts` names the comment record the other four share.
 it fetches its sibling `plan.css`; bundled, `bundle.ts` swaps it for a module
 returning the same text. Nothing downstream knows which it is running in.
 
+`server.ts` has the same shape either way. Compiled it is handed the page and
+serves it from memory; from the checkout it serves `app/` off the disk, which
+is the only reason the transpile exists.
+
 ## Develop
 
     just bundle    # dist/review.html, the single-file reviewer
+    just build     # dist/review-html, the binary; 61MB of it is bun
+    just install   # that binary, into ~/.local/bin
 
     just test      # everything, under bun test
-    just check     # typecheck, then biome over app/ test/ review.html server.ts
+    just check     # typecheck, then biome
     just fmt       # biome again, with fixes applied
     just typecheck # tsc alone
 
@@ -99,5 +134,8 @@ returning the same text. Nothing downstream knows which it is running in.
 
 `test/e2e.test.js` drives a real Chromium over the selection, painting,
 click-through and re-anchoring paths — the half that pure functions cannot
-reach. It skips itself, with the reason, when no browser is installed, so
-`just test` stays useful without one.
+reach — and over the bundle from a `file://` URL, which is what keeps the two
+builds from drifting apart. `test/cli.test.js` starts and stops real servers.
+Both skip themselves, with the reason, where they cannot run: no browser
+installed, or a sandbox that will not let a test have a port. So `just test`
+stays useful in either.

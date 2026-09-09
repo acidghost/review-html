@@ -16,5 +16,5 @@
     "skipLibCheck": true
   },
   // The tests stay JavaScript and need no types of their own.
-  "include": ["bundle.ts", "server.ts", "app"]
+  "include": ["binary.ts", "bundle.ts", "cli.ts", "server.ts", "state.ts", "app"]
 }

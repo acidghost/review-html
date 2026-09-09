@@ -1,47 +1,53 @@
 port := "8422"
-
-# The boundary on which plans the server will read. Your work area by default;
-# anything readable under it is one loopback GET away, so widening it to $HOME
-# would hand over ~/.ssh along with your plans.
-root := env("REVIEW_ROOT", parent_directory(justfile_directory()))
+cli := "bun run " + justfile_directory() + "/cli.ts --port " + port
 
 # Open the reviewer with no plan loaded, ready for a dropped file
 open:
     just review
 
-# Serve the reviewer on loopback, and plans from the root above
-serve:
-    REVIEW_ROOT="{{ root }}" bun run {{ justfile_directory() }}/server.ts --port {{ port }}
-
-# Stop a server left running by `just review`
-stop:
-    -pkill -f "server.ts --port {{ port }}"
-
 # Review a plan: just review ~/path/to/repo/.plans/2026-09-08-thing.html
-# The cd is what lets a relative plan mean what you typed; --open resolves it,
-# starts a server if none is listening, and opens the browser.
+# The cd is what lets a relative plan mean what you typed.
 review plan="":
-    cd {{ quote(invocation_directory()) }} && REVIEW_ROOT="{{ root }}" \
-      bun run {{ justfile_directory() }}/server.ts \
-      --port {{ port }} --open {{ quote(plan) }}
+    cd {{ quote(invocation_directory()) }} && {{ cli }} {{ quote(plan) }}
+
+# Serve in the foreground; `just review` starts a detached one of these
+serve:
+    {{ cli }} serve
+
+# Stop the server `just review` left running
+stop:
+    {{ cli }} stop
+
+# What is running, and which plans it will serve
+status:
+    {{ cli }} status
+
+# Open the bundled fixture plan
+demo:
+    just review test/fixtures/plan.html
 
 # Build dist/review.html: the whole reviewer in one file, openable from Finder
 bundle:
     bun run {{ justfile_directory() }}/bundle.ts
 
-# Open the bundled fixture plan
-demo:
-    just review test/fixtures/plan.html
+# Compile the standalone binary. ~60MB of it is the bun runtime.
+build: bundle
+    bun build --compile --outfile {{ justfile_directory() }}/dist/review-html \
+      {{ justfile_directory() }}/binary.ts
+
+# Put it on PATH, where it needs neither this checkout nor bun
+install: build
+    install -m 755 {{ justfile_directory() }}/dist/review-html ~/.local/bin/review-html
 
 # Everything; the browser suite skips itself unless `just browser` has run
 test:
     bun test
 
 fmt:
-    biome check --write app test review.html bundle.ts server.ts
+    biome check --write *.ts app test review.html
 
 check: typecheck
-    biome check app test review.html bundle.ts server.ts
+    biome check *.ts app test review.html
 
 # node_modules/.bin rather than bunx, which would reach for the registry if the
 # devDependency were missing instead of saying so
