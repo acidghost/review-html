@@ -10,6 +10,7 @@ import {
 import { bodyText, measure, paint, readHeadings, unpaint } from "./frame.js";
 import { markdown } from "./markdown.js";
 import { elide, shorten } from "./paths.js";
+import { planCss } from "./plan-css.js";
 import {
   keyFor,
   type Review,
@@ -436,7 +437,7 @@ const onSelect = () => {
 
 /* ---------- loading ---------- */
 
-const PLAN_CSS = new URL("plan.css", import.meta.url).href;
+let planStyles = ""; // read once at boot, so loadPlan stays synchronous
 
 const loadPlan = (html: string, name: string, label = "") => {
   planName = name; // basename: names the downloads, and the weak match key
@@ -468,10 +469,11 @@ const loadPlan = (html: string, name: string, label = "") => {
     for (const s of doc.querySelectorAll("script")) s.remove();
     doc.querySelector("#width")?.remove();
 
-    const link = doc.createElement("link");
-    link.rel = "stylesheet";
-    link.href = PLAN_CSS; // absolute: srcdoc has no useful base URL of its own
-    doc.head.append(link);
+    // Text, not a <link>: srcdoc has no useful base URL of its own, and a
+    // bundled reviewer has no sibling stylesheet to point one at.
+    const style = doc.createElement("style");
+    style.textContent = planStyles;
+    doc.head.append(style);
 
     headings = readHeadings(doc);
     planText = bodyText(doc);
@@ -564,13 +566,33 @@ const DRAG: Record<string, (e: Event) => void> = {
 for (const [type, fn] of Object.entries(DRAG))
   window.addEventListener(type, fn);
 
+// Exposed so a browser suite can drive loading without a real drop.
+const reviewer = {
+  loadPlan,
+  importJSON,
+  markdown: exportText,
+  revealMark,
+  comments: () => comments,
+};
+
 /* Served mode: fetch the plan named in the query string. One absolute path,
    read back through the server's /plan route. */
 const boot = async () => {
+  planStyles = await planCss();
+  // Only now, so `window.reviewer` appearing means a plan can be loaded.
+  window.reviewer = reviewer;
+
   const plan = new URLSearchParams(location.search).get("plan");
   if (!plan) return;
 
   const label = shorten(plan);
+  // A file:// page may not read another file, so there is nothing to try.
+  if (location.protocol === "file:") {
+    return fail(
+      `Cannot open ${label} from a file`,
+      "This reviewer was opened from disk, so it cannot fetch a plan by path. Drop the plan in instead.",
+    );
+  }
   try {
     const res = await fetch(`/plan?path=${encodeURIComponent(plan)}`);
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -583,13 +605,3 @@ const boot = async () => {
   }
 };
 boot();
-
-// Exposed so a browser suite can drive loading without a real drop.
-const reviewer = {
-  loadPlan,
-  importJSON,
-  markdown: exportText,
-  revealMark,
-  comments: () => comments,
-};
-window.reviewer = reviewer;

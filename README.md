@@ -3,10 +3,11 @@
 Read a Claude Code plan, attach inline comments to highlighted text, export them
 as Markdown to forward back to Claude.
 
-No build step: the browser asks for one ES module per file, and `server.ts`
-takes the types off each on the way out. Nothing is bundled, nothing is written
-to disk, and every import specifier reaches the browser as written — so the
-sources under `app/` are what runs.
+No build step to develop: the browser asks for one ES module per file, and
+`server.ts` takes the types off each on the way out. Nothing is written to disk
+and every import specifier reaches the browser as written — so the sources
+under `app/` are what runs. `just bundle` is the one exception, and what it
+writes lands in `dist/`.
 
 Nothing ships as a dependency either. Three arrive for development:
 `typescript` and `@types/bun` for `just typecheck`, and `playwright` for the
@@ -39,8 +40,17 @@ if there is none. So `just review` is safe to run repeatedly.
 file — everything works except the plan's path, which the browser withholds, so
 a review is then keyed on the filename alone. `just stop` shuts the server down.
 
-The reviewer has to be served: `<script type="module">` does not load over
-`file://`, so opening `review.html` from Finder will not work.
+### One file, no server
+
+    just bundle && open dist/review.html
+
+`dist/review.html` is the whole reviewer — modules and both stylesheets
+inlined — so it opens from Finder. Drop a plan in and everything works except
+loading one by path, which a `file://` page cannot do; a review is then keyed
+on the filename alone, the same trade `just open` makes.
+
+The sources say `<script type="module" src=…>`, which does not load over
+`file://`. The bundle has no `src` to fetch, which is the whole of the trick.
 
 ## How comments stay attached
 
@@ -65,12 +75,19 @@ and paint highlights.
 | `app/store.ts`  | `localStorage`, keyed by the plan's path            |
 | `app/*.css`     | reviewer chrome, and what is injected into plans    |
 | `server.ts`     | serves, transpiles, and builds the URL to open       |
+| `bundle.ts`     | the same app as one file                            |
 
 `frame.ts` takes the plan's `document` as an argument and `store.ts` takes the
 storage object, so neither reaches for a global — which is what makes them
 testable. `anchor.ts` names the comment record the other four share.
 
+`app/plan-css.ts` is the one place the served and bundled builds differ: served,
+it fetches its sibling `plan.css`; bundled, `bundle.ts` swaps it for a module
+returning the same text. Nothing downstream knows which it is running in.
+
 ## Develop
+
+    just bundle    # dist/review.html, the single-file reviewer
 
     just test      # everything, under bun test
     just check     # typecheck, then biome over app/ test/ review.html server.ts

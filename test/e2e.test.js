@@ -9,9 +9,12 @@
 
 import { afterAll, beforeAll, describe, test } from "bun:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { shorten } from "../app/paths.js";
+import { bundle } from "../bundle.ts";
 import { serve } from "../server.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -35,6 +38,11 @@ try {
   // not carry one, so say it here.
   console.log(`skipping the browser suite: ${unavailable}`);
 }
+
+// Both suites share the one browser, so closing it belongs to neither.
+afterAll(async () => {
+  await browser?.close();
+});
 
 /* ---------- driving the two documents ---------- */
 
@@ -98,8 +106,7 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     origin = server.url.origin;
   });
 
-  afterAll(async () => {
-    await browser?.close();
+  afterAll(() => {
     server?.stop(true);
   });
 
@@ -142,8 +149,8 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
       await frame.locator("mark[data-comment]").textContent(),
       quote,
     );
-    // plan.css is injected as a <link> into a sandboxed srcdoc frame; this is
-    // the assertion that it actually arrived.
+    // plan.css is injected as a <style> into a sandboxed srcdoc frame; this
+    // is the assertion that it actually arrived.
     assert.equal(
       await frame
         .locator("mark[data-comment]")
@@ -312,5 +319,75 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
       "Esc used to clear the whole comment",
     );
     assert.equal(await page.locator(".card").count(), 1);
+  });
+});
+
+/* The single file, over file://. This is the guard against the served and
+   bundled reviewers drifting apart, so it builds its own bundle rather than
+   trusting that `just bundle` has been run. */
+describe.skipIf(unavailable !== null)("bundled reviewer over file://", () => {
+  let page;
+
+  beforeAll(async () => {
+    const dir = await mkdtemp(join(tmpdir(), "review-html-"));
+    const file = join(dir, "review.html");
+    await writeFile(file, await bundle());
+
+    const context = await browser.newContext();
+    page = await context.newPage();
+    page.on("dialog", (d) => d.accept());
+    await page.goto(`file://${file}`);
+  });
+
+  // The plan has to be handed over, since a file:// page cannot fetch one.
+  const load = async () => {
+    await page.waitForFunction(() => window.reviewer);
+    const html = await readFile(PLAN, "utf8");
+    await page.evaluate(
+      (text) => window.reviewer.loadPlan(text, "plan.html"),
+      html,
+    );
+    return planFrame(page);
+  };
+
+  test("a comment survives a reload of the page opened from disk", async () => {
+    const frame = await load();
+    assert.equal(await frame.locator("h1").textContent(), "Fixture plan");
+
+    const quote = await select(
+      frame,
+      "This sentence exists",
+      "a selection can start",
+    );
+    await comment(page, "written with no server");
+
+    // plan.css is a literal in this build; this is where that is proven.
+    assert.equal(
+      await frame
+        .locator("mark[data-comment]")
+        .evaluate((m) => getComputedStyle(m).cursor),
+      "pointer",
+    );
+
+    await page.reload();
+    const reloaded = await load();
+    assert.match(await page.textContent("#note"), /restored 1 comment/);
+    assert.equal(
+      await reloaded.locator("mark[data-comment]").textContent(),
+      quote,
+    );
+    assert.equal(
+      await page.locator(".card textarea").inputValue(),
+      "written with no server",
+    );
+  });
+
+  test("a plan named in the query string says why it cannot be read", async () => {
+    const url = page.url();
+    await page.goto(`${url}?plan=${encodeURIComponent(PLAN)}`);
+    await page.waitForFunction(() => !document.getElementById("empty").hidden);
+    const empty = await page.textContent("#empty");
+    assert.match(empty, /Cannot open .* from a file/);
+    assert.match(empty, /Drop the plan in/);
   });
 });

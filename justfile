@@ -25,6 +25,10 @@ review plan="":
       bun run {{ justfile_directory() }}/server.ts \
       --port {{ port }} --open {{ quote(plan) }}
 
+# Build dist/review.html: the whole reviewer in one file, openable from Finder
+bundle:
+    bun run {{ justfile_directory() }}/bundle.ts
+
 # Open the bundled fixture plan
 demo:
     just review test/fixtures/plan.html
@@ -34,10 +38,10 @@ test:
     bun test
 
 fmt:
-    biome check --write app test review.html server.ts
+    biome check --write app test review.html bundle.ts server.ts
 
 check: typecheck
-    biome check app test review.html server.ts
+    biome check app test review.html bundle.ts server.ts
 
 # node_modules/.bin rather than bunx, which would reach for the registry if the
 # devDependency were missing instead of saying so
