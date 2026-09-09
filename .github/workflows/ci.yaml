@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+env:
+  # renovate: datasource=github-releases depName=jdx/mise
+  MISE_VERSION: 2026.8.16
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4.2.5
+        with:
+          version: ${{ env.MISE_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # `just browser` on a workstation; here the shared libs are missing too
+      - name: Install browser
+        run: node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Run linter
+        run: just check
+
+      - name: Run tests
+        run: just test
+
+      - name: Build binary
+        run: just build
+
+      - name: Smoke test
+        run: dist/review-html status
