@@ -3,11 +3,12 @@
    string: ?plan= is relative to the server root, and ?label= is how it should
    read on screen. */
 
-export const shorten = (path) =>
+export const shorten = (path: string) =>
   path.replace(/^\/(?:Users|home)\/[^/]+(?=\/)/, "~");
 
-export const elide = (s, max = 64) =>
+export const elide = (s: string, max = 64) =>
   s.length <= max ? s : `${s.slice(0, 14)}…${s.slice(-(max - 15))}`;
 
-export const labelFor = (plan, label) =>
+// `label` comes straight off the query string, so null is its natural empty.
+export const labelFor = (plan: string, label: string | null) =>
   label || (plan.startsWith("/") ? shorten(plan) : `~/${plan}`);

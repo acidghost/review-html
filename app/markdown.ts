@@ -1,7 +1,7 @@
-import { tidy } from "./anchor.js";
+import { type Comment, tidy } from "./anchor.js";
 
 /* The export is the whole point of the tool: what gets pasted back to Claude. */
-export const markdown = (list, label) => {
+export const markdown = (list: Comment[], label: string) => {
   const head = `Review of \`${label}\` — ${list.length} comment${
     list.length === 1 ? "" : "s"
   }`;

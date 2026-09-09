@@ -1,5 +1,9 @@
+[settings]
+minimum_release_age = "7d"
+lockfile = true
+pin = true
+
 [tools]
 biome = "2.5.11"
-bun = "1.3.14"
+bun = "1.4.0"
 just = "1.58.0"
-playwright = "1.62.1"

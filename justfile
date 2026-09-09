@@ -10,40 +10,19 @@ open:
 
 # Serve the work area on loopback, so the reviewer can fetch plans by path
 serve:
-    python3 -m http.server {{ port }} --bind 127.0.0.1 -d "{{ root }}"
+    REVIEW_ROOT="{{ root }}" bun run {{ justfile_directory() }}/server.ts --port {{ port }}
 
 # Stop a server left running by `just review`
 stop:
-    -pkill -f "http.server {{ port }}"
+    -pkill -f "server.ts --port {{ port }}"
 
 # Review a plan: just review ~/path/to/repo/.plans/2026-09-08-thing.html
+# The cd is what lets a relative plan mean what you typed; --open resolves it,
+# starts a server if none is listening, and opens the browser.
 review plan="":
-    #!/usr/bin/env bash
-    set -euo pipefail
-    root="{{ root }}"
-    under() {
-      case "$1" in "$root"/*) ;;
-        *) echo "$1 is outside $root; set REVIEW_ROOT to widen" >&2; return 1 ;;
-      esac
-    }
-    # The reviewer is served too: ES modules do not load over file://.
-    app="{{ justfile_directory() }}"
-    under "$app"
-    query=""
-    if [[ -n "{{ plan }}" ]]; then
-      cd "{{ invocation_directory() }}"
-      [[ -f "{{ plan }}" ]] || { echo "no such plan: {{ plan }}" >&2; exit 1; }
-      abs="$(cd "$(dirname "{{ plan }}")" && pwd)/$(basename "{{ plan }}")"
-      under "$abs"
-      enc() { jq -rn --arg s "$1" '$s|@uri'; }
-      query="?plan=$(enc "${abs#"$root"/}")&label=$(enc "${abs/#$HOME/\~}")"
-    fi
-    if ! curl -sf -o /dev/null --max-time 1 "http://127.0.0.1:{{ port }}/"; then
-      echo "serving $root on 127.0.0.1:{{ port }} (just stop to shut it down)"
-      (python3 -m http.server {{ port }} --bind 127.0.0.1 -d "$root" >/dev/null 2>&1 &)
-      sleep 1
-    fi
-    open "http://127.0.0.1:{{ port }}/${app#"$root"/}/review.html$query"
+    cd {{ quote(invocation_directory()) }} && REVIEW_ROOT="{{ root }}" \
+      bun run {{ justfile_directory() }}/server.ts \
+      --port {{ port }} --open {{ quote(plan) }}
 
 # Open the bundled fixture plan
 demo:
@@ -54,14 +33,20 @@ test:
     bun test
 
 fmt:
-    biome check --write app test review.html
+    biome check --write app test review.html server.ts
 
-check:
-    biome check app test review.html
+check: typecheck
+    biome check app test review.html server.ts
 
-# Download the browser the e2e tests need (network: cdn.playwright.dev)
+# node_modules/.bin rather than bunx, which would reach for the registry if the
+# devDependency were missing instead of saying so
+typecheck:
+    node_modules/.bin/tsc
+
+# Download the browser the e2e tests need (network: cdn.playwright.dev).
+# The package ships no postinstall, so this stays an explicit one-off.
 browser:
-    playwright install chromium
+    node_modules/.bin/playwright install chromium
 
 # Only the browser suite
 e2e:

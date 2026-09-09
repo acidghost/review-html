@@ -1,5 +1,5 @@
+import { test } from "bun:test";
 import assert from "node:assert/strict";
-import test from "node:test";
 import { elide, labelFor, shorten } from "../app/paths.js";
 
 test("a macOS home directory collapses to a tilde", () => {

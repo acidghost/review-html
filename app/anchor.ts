@@ -3,9 +3,32 @@
 
 export const CONTEXT = 32; // characters of context kept either side of a quote
 
-export const tidy = (s) => s.replace(/\s+/g, " ").trim();
+/* All locate() needs: where the quote was, and what sat either side of it. */
+export type Anchor = {
+  start: number;
+  quote: string;
+  prefix: string;
+  suffix: string;
+};
 
-export const hash = (text) => {
+/* An anchor plus what the sidebar shows, which is the shape that crosses every
+   module here and the one `importJSON` validates at the door. `orphan` is the
+   exception to the rest — it is what re-anchoring concluded, not something
+   stored. */
+export type Comment = Anchor & {
+  id: string;
+  section: string;
+  body: string;
+  orphan?: boolean;
+};
+
+/* Produced by frame.ts, consumed by sectionFor. `start` is an offset into the
+   same body text a comment's is. */
+export type Heading = { level: number; text: string; start: number };
+
+export const tidy = (s: string) => s.replace(/\s+/g, " ").trim();
+
+export const hash = (text: string) => {
   let h = 0x811c9dc5; // FNV-1a: enough to notice "this is a different file"
   for (let i = 0; i < text.length; i++) {
     h ^= text.charCodeAt(i);
@@ -16,7 +39,7 @@ export const hash = (text) => {
 
 /* Where does this anchor's quote live now? The stored offset is only a hint —
    any edit above it shifts everything below. */
-export const locate = (text, a) => {
+export const locate = (text: string, a: Anchor) => {
   if (text.slice(a.start, a.start + a.quote.length) === a.quote) return a.start;
 
   // With no context to disambiguate with, this degrades to "first occurrence
@@ -40,8 +63,8 @@ export const locate = (text, a) => {
 
 /* The heading trail above an offset, so a comment reads as "Phase 2 › Storage"
    rather than a bare character position. */
-export const sectionFor = (headings, start) => {
-  const crumb = [];
+export const sectionFor = (headings: Heading[], start: number) => {
+  const crumb: string[] = [];
   for (const h of headings) {
     if (h.start > start) break;
     crumb[h.level - 2] = h.text;

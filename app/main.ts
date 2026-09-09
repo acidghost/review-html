@@ -1,24 +1,52 @@
-import { CONTEXT, hash, locate, sectionFor, tidy } from "./anchor.js";
+import {
+  CONTEXT,
+  type Comment,
+  type Heading,
+  hash,
+  locate,
+  sectionFor,
+  tidy,
+} from "./anchor.js";
 import { bodyText, measure, paint, readHeadings, unpaint } from "./frame.js";
 import { markdown } from "./markdown.js";
 import { elide, labelFor } from "./paths.js";
-import { keyFor, read as readStore, write as writeStore } from "./store.js";
+import {
+  keyFor,
+  type Review,
+  read as readStore,
+  write as writeStore,
+} from "./store.js";
 
-const $ = (id) => document.getElementById(id);
-const iframe = $("plan");
+declare global {
+  interface Window {
+    // Chromium only; saveMarkdown() falls back to a download elsewhere.
+    showSaveFilePicker?: (options: {
+      suggestedName?: string;
+      types?: { description: string; accept: Record<string, string[]> }[];
+    }) => Promise<FileSystemFileHandle>;
+    reviewer: typeof reviewer;
+  }
+}
 
-let doc = null; // the plan's document, inside the iframe
-let comments = []; // kept sorted by `start`
-let headings = []; // {level, text, start}, for section breadcrumbs
+/* review.html is ours and fixed, so a missing id is a bug rather than a case
+   to handle. The type argument is only needed for the few elements read for
+   more than their `hidden`. */
+const $ = <T extends HTMLElement = HTMLElement>(id: string) =>
+  document.getElementById(id) as T;
+const iframe = $<HTMLIFrameElement>("plan");
+
+let doc: Document | null = null; // the plan's document, inside the iframe
+let comments: Comment[] = []; // kept sorted by `start`
+let headings: Heading[] = []; // for section breadcrumbs
 let planName = ""; // basename, all the File API reliably gives us
 let planPath = ""; // the path `just review` passed; empty for a dropped file
 let planLabel = ""; // planPath, or the basename when that is all we have
 let planText = ""; // body text as loaded; painting never alters it
 let planHash = "";
-let saveTimer = null;
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let storageOk = true;
 let seq = 0;
-let active = null; // id of the comment highlighted on both sides
+let active: string | null = null; // the comment highlighted on both sides
 
 /* ---------- comments ---------- */
 
@@ -37,7 +65,7 @@ const pruneEmpty = () => {
 
 const addComment = () => {
   const sel = doc?.getSelection();
-  if (!sel || sel.isCollapsed || !sel.rangeCount) return;
+  if (!doc || !sel || sel.isCollapsed || !sel.rangeCount) return;
   const range = sel.getRangeAt(0);
   const quote = range.toString();
   if (!quote.trim()) return;
@@ -63,18 +91,20 @@ const addComment = () => {
   });
   sortComments();
 
-  doc.getSelection().removeAllRanges();
+  sel.removeAllRanges();
   hideAdd();
   render();
   queueSave();
-  const box = document.querySelector(`.card[data-id="${id}"] textarea`);
-  box.focus();
-  box.scrollIntoView({ block: "nearest" });
+  const box = document.querySelector<HTMLTextAreaElement>(
+    `.card[data-id="${id}"] textarea`,
+  );
+  box?.focus();
+  box?.scrollIntoView({ block: "nearest" });
 };
 
 /* Focusing another card blurs this one, so this runs mid-focus(): drop the one
    card instead of re-rendering, or focus lands on a dead node. */
-const dropEmpty = (id) => {
+const dropEmpty = (id: string) => {
   const c = comments.find((x) => x.id === id);
   if (!c || c.body.trim()) return;
   comments = comments.filter((x) => x.id !== id);
@@ -85,7 +115,7 @@ const dropEmpty = (id) => {
   queueSave();
 };
 
-const deleteComment = (id) => {
+const deleteComment = (id: string) => {
   comments = comments.filter((x) => x.id !== id);
   unpaint(doc, id);
   if (active === id) active = null;
@@ -93,34 +123,37 @@ const deleteComment = (id) => {
   queueSave();
 };
 
-const setActive = (id) => {
+const setActive = (id: string | null) => {
   active = id;
   for (const card of $("cards").children) {
-    card.classList.toggle("active", card.dataset.id === id);
+    card.classList.toggle("active", (card as HTMLElement).dataset.id === id);
   }
-  for (const m of doc?.querySelectorAll("mark[data-comment]") ?? []) {
+  for (const m of doc?.querySelectorAll<HTMLElement>("mark[data-comment]") ??
+    []) {
     m.classList.toggle("active", m.dataset.comment === id);
   }
 };
 
-const revealMark = (id) => {
+const revealMark = (id: string) => {
   setActive(id);
   doc
     ?.querySelector(`mark[data-comment="${id}"]`)
     ?.scrollIntoView({ block: "center", behavior: "smooth" });
 };
 
-const focusCard = (id) => {
+const focusCard = (id: string) => {
   setActive(id);
-  const card = document.querySelector(`.card[data-id="${id}"]`);
+  const card = document.querySelector<HTMLElement>(`.card[data-id="${id}"]`);
   if (!card) return;
   card.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  card.querySelector("textarea").focus();
+  card.querySelector<HTMLTextAreaElement>("textarea")?.focus();
 };
 
-const onPlanClick = (e) => {
-  const mark = e.target.closest?.("mark[data-comment]");
-  if (mark) focusCard(mark.dataset.comment);
+const onPlanClick = (e: Event) => {
+  // Optional call: clicks land on the document too, which has no closest().
+  const mark = (e.target as Element).closest?.("mark[data-comment]");
+  const id = mark?.getAttribute("data-comment");
+  if (id) focusCard(id);
   else setActive(null);
 };
 
@@ -184,7 +217,7 @@ const render = () => {
     box.addEventListener("blur", () => dropEmpty(c.id));
 
     card.addEventListener("click", (e) => {
-      if (!e.target.closest("button")) revealMark(c.id);
+      if (!(e.target as Element).closest("button")) revealMark(c.id);
     });
 
     card.append(top, quote, box);
@@ -197,23 +230,29 @@ const render = () => {
 
 const written = () => comments.filter((c) => c.body.trim());
 
-const note = (msg) => {
+const note = (msg: string) => {
   $("note").textContent = msg ? `· ${msg}` : "";
 };
 
 const refreshCount = () => {
   const n = written().length;
   $("count").textContent = doc ? `${n} comment${n === 1 ? "" : "s"}` : "";
-  $("exportBtn").disabled = n === 0;
-  $("jsonBtn").disabled = n === 0;
+  $<HTMLButtonElement>("exportBtn").disabled = n === 0;
+  $<HTMLButtonElement>("jsonBtn").disabled = n === 0;
 };
 
 /* ---------- re-anchoring ---------- */
 
-const restore = (saved, exact = true) => {
+const restore = (saved: Review, exact = true) => {
+  if (!doc) return; // nothing to paint into until a plan has loaded
   for (const c of comments) unpaint(doc, c.id);
 
-  comments = saved.comments.map((c) => ({ prefix: "", suffix: "", ...c }));
+  // Reviews saved before context was recorded carry neither field.
+  comments = saved.comments.map((c) => ({
+    ...c,
+    prefix: c.prefix ?? "",
+    suffix: c.suffix ?? "",
+  }));
   let lost = 0;
   for (const c of comments) {
     const at = locate(planText, c);
@@ -246,7 +285,7 @@ const restore = (saved, exact = true) => {
 
 const currentKey = () => keyFor(planPath || planName);
 
-const snapshot = () => ({
+const snapshot = (): Review => ({
   name: planName,
   path: planPath,
   hash: planHash,
@@ -294,7 +333,7 @@ const baseName = () => planName.replace(/\.html?$/i, "");
 
 const exportText = () => markdown(written(), planLabel);
 
-const download = (text, name, type) => {
+const download = (text: string, name: string, type: string) => {
   const link = document.createElement("a");
   link.href = URL.createObjectURL(new Blob([text], { type }));
   link.download = name;
@@ -311,9 +350,10 @@ const saveJSON = () =>
     "application/json",
   );
 
-const importJSON = (text) => {
+const importJSON = (text: string) => {
   if (!doc) return note("open the plan first, then drop the review");
-  let data;
+  // The same optimistic claim store.ts makes; the check below is the real one.
+  let data: Review;
   try {
     data = JSON.parse(text);
   } catch {
@@ -342,8 +382,9 @@ const saveMarkdown = async () => {
       $("status").textContent = `Saved ${handle.name}`;
       return;
     } catch (err) {
-      if (err.name === "AbortError") return;
-      $("status").textContent = `Could not save: ${err.message}`;
+      const aborted = err as DOMException;
+      if (aborted.name === "AbortError") return;
+      $("status").textContent = `Could not save: ${aborted.message}`;
       return;
     }
   }
@@ -353,7 +394,8 @@ const saveMarkdown = async () => {
 
 const showExport = async () => {
   const text = exportText();
-  $("md").value = text;
+  const md = $<HTMLTextAreaElement>("md");
+  md.value = text;
   $("overlay").hidden = false;
   $("status").textContent = "";
   let ok = false;
@@ -362,12 +404,12 @@ const showExport = async () => {
     ok = true;
   } catch {
     try {
-      $("md").select();
+      md.select();
       ok = document.execCommand("copy");
     } catch {}
   }
   $("status").textContent = ok ? "Copied to clipboard" : "Select and copy";
-  if (!ok) $("md").select();
+  if (!ok) md.select();
 };
 
 /* ---------- selection ---------- */
@@ -377,7 +419,7 @@ const hideAdd = () => {
 };
 
 const onSelect = () => {
-  const sel = doc.getSelection();
+  const sel = doc?.getSelection();
   if (!sel || sel.isCollapsed || !sel.rangeCount) return hideAdd();
 
   const range = sel.getRangeAt(0);
@@ -396,7 +438,7 @@ const onSelect = () => {
 
 const PLAN_CSS = new URL("plan.css", import.meta.url).href;
 
-const loadPlan = (html, name, label = "") => {
+const loadPlan = (html: string, name: string, label = "") => {
   planName = name; // basename: names the downloads, and the weak match key
   planPath = label; // the stable storage key; empty for a dropped file
   planLabel = label || name;
@@ -406,16 +448,20 @@ const loadPlan = (html, name, label = "") => {
   hideAdd();
 
   iframe.onload = () => {
+    let loaded: Document | null = null;
     try {
-      doc = iframe.contentDocument;
-      if (!doc) throw new Error("no document");
+      loaded = iframe.contentDocument;
     } catch {
+      // Some browsers throw here rather than handing back null.
+    }
+    if (!loaded) {
       fail(
         "Cannot read the plan",
         "This browser blocks access to the sandboxed frame.",
       );
       return;
     }
+    doc = loaded;
 
     // Scripts are inert under this sandbox, but their source text would
     // otherwise count as document text and shift every offset past it.
@@ -453,7 +499,7 @@ const loadPlan = (html, name, label = "") => {
   iframe.srcdoc = html;
 };
 
-const fail = (title, detail) => {
+const fail = (title: string, detail: string) => {
   const empty = $("empty");
   empty.textContent = "";
   const heading = document.createElement("b");
@@ -464,7 +510,7 @@ const fail = (title, detail) => {
   empty.hidden = false;
 };
 
-const openFile = (file) => {
+const openFile = (file: File | undefined) => {
   if (!file) return;
   const isReview = /\.json$/i.test(file.name);
   const reader = new FileReader();
@@ -481,7 +527,9 @@ const openFile = (file) => {
 $("add").addEventListener("mousedown", (e) => e.preventDefault()); // keep the selection
 $("add").addEventListener("click", addComment);
 $("openBtn").addEventListener("click", () => $("file").click());
-$("file").addEventListener("change", (e) => openFile(e.target.files[0]));
+$("file").addEventListener("change", (e) =>
+  openFile((e.target as HTMLInputElement).files?.[0]),
+);
 $("jsonBtn").addEventListener("click", saveJSON);
 $("exportBtn").addEventListener("click", showExport);
 $("mdBtn").addEventListener("click", saveMarkdown);
@@ -494,7 +542,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 let dragDepth = 0;
-const DRAG = {
+const DRAG: Record<string, (e: Event) => void> = {
   dragenter: (e) => {
     e.preventDefault();
     if (++dragDepth === 1) $("drop").hidden = false;
@@ -510,7 +558,7 @@ const DRAG = {
     e.preventDefault();
     dragDepth = 0;
     $("drop").hidden = true;
-    openFile(e.dataTransfer?.files?.[0]);
+    openFile((e as DragEvent).dataTransfer?.files?.[0]);
   },
 };
 for (const [type, fn] of Object.entries(DRAG))
@@ -528,21 +576,22 @@ const boot = async () => {
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    loadPlan(await res.text(), plan.split("/").pop(), label);
+    loadPlan(await res.text(), plan.split("/").pop() ?? plan, label);
   } catch (err) {
     fail(
       `Could not load ${label}`,
-      `${err.message} — is \`just serve\` running?`,
+      `${(err as Error).message} — is \`just serve\` running?`,
     );
   }
 };
 boot();
 
 // Exposed so a browser suite can drive loading without a real drop.
-window.reviewer = {
+const reviewer = {
   loadPlan,
   importJSON,
   markdown: exportText,
   revealMark,
   comments: () => comments,
 };
+window.reviewer = reviewer;

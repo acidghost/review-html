@@ -1,5 +1,5 @@
+import { test } from "bun:test";
 import assert from "node:assert/strict";
-import test from "node:test";
 import { locate } from "../app/anchor.js";
 
 const anchor = (text, quote, context = 32) => {

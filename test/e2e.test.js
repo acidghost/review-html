@@ -2,66 +2,37 @@
    exactly the paths the pure-function tests cannot reach.
 
    Needs a browser binary: `just browser`. Without one the suite skips rather
-   than fails, so `just test` stays useful on a machine that has none. */
+   than fails, so `just test` stays useful on a machine that has none.
 
+   Drives the real server.ts, so a break in how plans are served shows up here
+   rather than only in `just review`. */
+
+import { afterAll, beforeAll, describe, test } from "bun:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { createServer } from "node:http";
-import { join, normalize } from "node:path";
-import { after, before, describe, test } from "node:test";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { serve } from "../server.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PLAN = "test/fixtures/plan.html";
 const LABEL = "~/work/review-html/test/fixtures/plan.html";
 
-/* Stands in for `python3 -m http.server`: the app only needs correct MIME
-   types (a wrong one on .js blocks module loading outright) and a root. */
-const MIME = {
-  ".html": "text/html",
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-};
+/* Both halves of "is there a browser" have to be settled before the describe
+   is declared, because that is when bun:test decides to skip it — and only
+   launching proves the second half. Hence an import and a launch out here.
 
-const startServer = async () => {
-  const server = createServer(async (req, res) => {
-    const path = decodeURIComponent(new URL(req.url, "http://x").pathname);
-    const file = join(ROOT, normalize(path));
-    if (!file.startsWith(ROOT)) return res.writeHead(403).end();
-    try {
-      const body = await readFile(file);
-      res.writeHead(200, {
-        "content-type": MIME[path.slice(path.lastIndexOf("."))] ?? "text/plain",
-      });
-      res.end(body);
-    } catch {
-      res.writeHead(404).end("not found");
-    }
-  });
-  await new Promise((done) => server.listen(0, "127.0.0.1", done));
-  return { server, origin: `http://127.0.0.1:${server.address().port}` };
-};
-
-const loadPlaywright = async () => {
-  try {
-    return await import("playwright");
-  } catch {
-    // Installed as a tool rather than a dependency, which is where mise puts it.
-    const where = execFileSync("mise", ["where", "playwright"], {
-      encoding: "utf8",
-    }).trim();
-    return await import(`${where}/node_modules/playwright/index.mjs`);
-  }
-};
-
-let chromium = null;
+   Dynamic, so a missing package skips the suite like a missing binary does. */
+let browser = null;
 let unavailable = null;
 try {
-  ({ chromium } = await loadPlaywright());
+  const { chromium } = await import("playwright");
+  browser = await chromium.launch();
 } catch (err) {
-  unavailable = `playwright not importable: ${err.message}`;
+  unavailable = err.message.split("\n")[0];
+  // The reason is the point of skipping rather than failing; bun:test does
+  // not carry one, so say it here.
+  console.log(`skipping the browser suite: ${unavailable}`);
 }
 
 /* ---------- driving the two documents ---------- */
@@ -116,25 +87,19 @@ const comment = async (page, body) => {
   await page.waitForTimeout(500); // outlast the 400ms save debounce
 };
 
-describe("reviewer in a browser", { skip: unavailable ?? false }, () => {
-  let browser;
+describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
   let server;
   let origin;
 
-  before(async () => {
-    try {
-      browser = await chromium.launch();
-    } catch (err) {
-      // No binary: report it as a skip on every test rather than a hard failure.
-      unavailable = err.message.split("\n")[0];
-      return;
-    }
-    ({ server, origin } = await startServer());
+  beforeAll(() => {
+    // Port 0: a fixed one would collide with a `just review` left running.
+    server = serve({ root: ROOT, port: 0 });
+    origin = server.url.origin;
   });
 
-  after(async () => {
+  afterAll(async () => {
     await browser?.close();
-    server?.close();
+    server?.stop(true);
   });
 
   const open = async (
@@ -147,8 +112,7 @@ describe("reviewer in a browser", { skip: unavailable ?? false }, () => {
     return page;
   };
 
-  test("the served plan renders, and the header shows its path", async (t) => {
-    if (unavailable) return t.skip(unavailable);
+  test("the served plan renders, and the header shows its path", async () => {
     const page = await open();
     const frame = await planFrame(page);
 
@@ -163,8 +127,7 @@ describe("reviewer in a browser", { skip: unavailable ?? false }, () => {
     );
   });
 
-  test("a selection inside one paragraph becomes one mark and one comment", async (t) => {
-    if (unavailable) return t.skip(unavailable);
+  test("a selection inside one paragraph becomes one mark and one comment", async () => {
     const page = await open();
     const frame = await planFrame(page);
 
@@ -196,8 +159,7 @@ describe("reviewer in a browser", { skip: unavailable ?? false }, () => {
     assert.ok(md.includes("why does it exist?"));
   });
 
-  test("a selection across two paragraphs is several marks but one comment", async (t) => {
-    if (unavailable) return t.skip(unavailable);
+  test("a selection across two paragraphs is several marks but one comment", async () => {
     const page = await open();
     const frame = await planFrame(page);
 
@@ -231,8 +193,7 @@ describe("reviewer in a browser", { skip: unavailable ?? false }, () => {
     );
   });
 
-  test("two comments export in document order with their own sections", async (t) => {
-    if (unavailable) return t.skip(unavailable);
+  test("two comments export in document order with their own sections", async () => {
     const page = await open();
     const frame = await planFrame(page);
 
@@ -248,8 +209,7 @@ describe("reviewer in a browser", { skip: unavailable ?? false }, () => {
     assert.ok(md.includes("## 2 · Steps › 1. Parse the input"), md);
   });
 
-  test("a comment re-anchors after the plan is rewritten above it", async (t) => {
-    if (unavailable) return t.skip(unavailable);
+  test("a comment re-anchors after the plan is rewritten above it", async () => {
     const page = await open();
     const frame = await planFrame(page);
 
@@ -283,8 +243,7 @@ describe("reviewer in a browser", { skip: unavailable ?? false }, () => {
     );
   });
 
-  test("clicking a highlight focuses its card", async (t) => {
-    if (unavailable) return t.skip(unavailable);
+  test("clicking a highlight focuses its card", async () => {
     const page = await open();
     const frame = await planFrame(page);
 
@@ -305,8 +264,7 @@ describe("reviewer in a browser", { skip: unavailable ?? false }, () => {
     );
   });
 
-  test("deleting a comment unwraps its highlight", async (t) => {
-    if (unavailable) return t.skip(unavailable);
+  test("deleting a comment unwraps its highlight", async () => {
     const page = await open();
     const frame = await planFrame(page);
 
@@ -331,8 +289,7 @@ describe("reviewer in a browser", { skip: unavailable ?? false }, () => {
     );
   });
 
-  test("Esc undoes the current edit instead of wiping the comment", async (t) => {
-    if (unavailable) return t.skip(unavailable);
+  test("Esc undoes the current edit instead of wiping the comment", async () => {
     const page = await open();
     const frame = await planFrame(page);
 
