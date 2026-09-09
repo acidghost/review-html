@@ -1,14 +1,15 @@
 port := "8422"
 
-# A plan and this checkout have to sit under one served root; the directory you
-# cloned into is the smallest one that covers both without knowing your layout.
+# The boundary on which plans the server will read. Your work area by default;
+# anything readable under it is one loopback GET away, so widening it to $HOME
+# would hand over ~/.ssh along with your plans.
 root := env("REVIEW_ROOT", parent_directory(justfile_directory()))
 
 # Open the reviewer with no plan loaded, ready for a dropped file
 open:
     just review
 
-# Serve the work area on loopback, so the reviewer can fetch plans by path
+# Serve the reviewer on loopback, and plans from the root above
 serve:
     REVIEW_ROOT="{{ root }}" bun run {{ justfile_directory() }}/server.ts --port {{ port }}
 

@@ -9,7 +9,7 @@ import {
 } from "./anchor.js";
 import { bodyText, measure, paint, readHeadings, unpaint } from "./frame.js";
 import { markdown } from "./markdown.js";
-import { elide, labelFor } from "./paths.js";
+import { elide, shorten } from "./paths.js";
 import {
   keyFor,
   type Review,
@@ -564,17 +564,15 @@ const DRAG: Record<string, (e: Event) => void> = {
 for (const [type, fn] of Object.entries(DRAG))
   window.addEventListener(type, fn);
 
-/* Served mode: fetch the plan named in the query string. Relative to the
-   server root, so root-anchored rather than page-relative. */
+/* Served mode: fetch the plan named in the query string. One absolute path,
+   read back through the server's /plan route. */
 const boot = async () => {
-  const params = new URLSearchParams(location.search);
-  const plan = params.get("plan");
+  const plan = new URLSearchParams(location.search).get("plan");
   if (!plan) return;
 
-  const label = labelFor(plan, params.get("label"));
-  const url = `/${plan.split("/").map(encodeURIComponent).join("/")}`;
+  const label = shorten(plan);
   try {
-    const res = await fetch(url);
+    const res = await fetch(`/plan?path=${encodeURIComponent(plan)}`);
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     loadPlan(await res.text(), plan.split("/").pop() ?? plan, label);
   } catch (err) {

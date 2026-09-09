@@ -20,14 +20,16 @@ plus `just` and `biome`. Everything else is a `bun install` away.
 
     just review ~/path/to/repo/.plans/2026-09-08-thing.html
 
-Serves the directory this repo was cloned into — your work area — on loopback,
-and opens the reviewer pointed at that plan. Select text, *Add comment*, type;
-comments save themselves. *Copy Markdown* puts the export on the clipboard,
-*Save .md* writes `<plan>.review.md`.
+Starts a loopback server and opens the reviewer pointed at that plan. Select
+text, *Add comment*, type; comments save themselves. *Copy Markdown* puts the
+export on the clipboard, *Save .md* writes `<plan>.review.md`.
 
-Plans outside that root are refused, since the server cannot reach them. Set
-`REVIEW_ROOT` to serve somewhere else — narrower if you keep plans in one repo,
-wider if your plans and this checkout live far apart.
+The reviewer and the plans are two namespaces. The reviewer comes off this
+checkout at a fixed `/review.html`; plans are read by absolute path through
+`/plan`, bounded by a root of their own — your work area by default. Plans
+outside it are refused, and only `.html` is served: anything readable under
+that root is one loopback GET away, which is why it is not `$HOME`. Set
+`REVIEW_ROOT` to move the boundary.
 
 The recipe is a single call to `server.ts --open`, which resolves the plan,
 reuses a server already listening on the port, and starts a detached one only

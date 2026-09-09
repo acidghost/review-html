@@ -10,13 +10,14 @@
 import { afterAll, beforeAll, describe, test } from "bun:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { shorten } from "../app/paths.js";
 import { serve } from "../server.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const PLAN = "test/fixtures/plan.html";
-const LABEL = "~/work/review-html/test/fixtures/plan.html";
+const PLAN = `${ROOT}test/fixtures/plan.html`;
+// What the reviewer derives for itself, now that no label is passed to it.
+const LABEL = shorten(PLAN);
 
 /* Both halves of "is there a browser" have to be settled before the describe
    is declared, because that is when bun:test decides to skip it — and only
@@ -93,7 +94,7 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
 
   beforeAll(() => {
     // Port 0: a fixed one would collide with a `just review` left running.
-    server = serve({ root: ROOT, port: 0 });
+    server = serve({ app: ROOT, root: ROOT, port: 0 });
     origin = server.url.origin;
   });
 
@@ -102,9 +103,7 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     server?.stop(true);
   });
 
-  const open = async (
-    query = `?plan=${encodeURIComponent(PLAN)}&label=${encodeURIComponent(LABEL)}`,
-  ) => {
+  const open = async (query = `?plan=${encodeURIComponent(PLAN)}`) => {
     const context = await browser.newContext();
     const page = await context.newPage();
     page.on("dialog", (d) => d.accept()); // the delete button confirms
@@ -220,12 +219,15 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     );
     await comment(page, "still relevant");
 
-    const revised = (await readFile(join(ROOT, PLAN), "utf8")).replace(
+    const revised = (await readFile(PLAN, "utf8")).replace(
       "<h2>Goal</h2>",
       "<h2>Goal</h2>\n<p>A paragraph inserted above the anchor, shifting every offset below it.</p>",
     );
-    await page.route(`**/${PLAN}`, (route) =>
-      route.fulfill({ contentType: "text/html", body: revised }),
+    // Matched on the pathname: the plan is in the query string now, where a
+    // glob would have to account for its encoding.
+    await page.route(
+      (url) => url.pathname === "/plan",
+      (route) => route.fulfill({ contentType: "text/html", body: revised }),
     );
     await page.reload();
     const reanchored = await planFrame(page);
