@@ -13,8 +13,8 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { shorten } from "../src/app/paths.js";
 import { bundle } from "../scripts/bundle.ts";
+import { shorten } from "../src/app/paths.js";
 import { serve } from "../src/server.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
