@@ -13,9 +13,9 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { shorten } from "../app/paths.js";
-import { bundle } from "../bundle.ts";
-import { serve } from "../server.ts";
+import { shorten } from "../src/app/paths.js";
+import { bundle } from "../scripts/bundle.ts";
+import { serve } from "../src/server.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PLAN = `${ROOT}test/fixtures/plan.html`;
@@ -103,7 +103,7 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
   beforeAll(() => {
     // Port 0: a fixed one would collide with a server left running.
     // The fixture is handed over directly, since /_open is the CLI's job.
-    server = serve({ app: ROOT, port: 0, allow: new Set([PLAN]) });
+    server = serve({ app: `${ROOT}src`, port: 0, allow: new Set([PLAN]) });
     origin = server.url.origin;
   });
 

@@ -4,7 +4,7 @@
    single page `just bundle` produces. */
 
 import { main } from "./cli.ts";
-import page from "./dist/review.html" with { type: "text" };
+import page from "../dist/review.html" with { type: "text" };
 
 /* bun-types declares every .html import as an HTMLBundle, for the fullstack
    server this is not using; `with { type: "text" }` makes it a string. */

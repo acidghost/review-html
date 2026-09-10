@@ -4,8 +4,8 @@ Read a Claude Code plan, attach inline comments to highlighted text, export them
 as Markdown to forward back to Claude.
 
 No build step to develop: the browser asks for one ES module per file, and
-`server.ts` takes the types off each on the way out — so the sources under
-`app/` are what runs, with every import specifier reaching the browser as
+`src/server.ts` takes the types off each on the way out — so the sources under
+`src/` are what runs, with every import specifier reaching the browser as
 written. The two builds are for shipping, and everything they write lands in
 `dist/`: `just bundle` for the single page, `just build` for the binary that
 embeds it.
@@ -92,31 +92,32 @@ and paint highlights.
 
 ## Layout
 
-| file            | what it holds                                       |
-| --------------- | --------------------------------------------------- |
-| `review.html`   | markup only                                         |
-| `app/main.ts`   | state and wiring; the only DOM-heavy file           |
-| `app/anchor.ts` | `locate`, the heading breadcrumb, the hash          |
-| `app/frame.ts`  | painting and measuring inside the plan's iframe     |
-| `app/store.ts`  | `localStorage`, keyed by the plan's path            |
-| `app/*.css`     | reviewer chrome, and what is injected into plans    |
-| `server.ts`     | routes, the transpile, and the allowlist             |
-| `cli.ts`        | the commands, and the URL to open                   |
-| `state.ts`      | pid, port and token, at `0600`                      |
-| `bundle.ts`     | the same app as one file                            |
-| `binary.ts`     | the compile entrypoint: `cli.ts` plus that file     |
+| file                | what it holds                                       |
+| ------------------- | --------------------------------------------------- |
+| `src/review.html`   | markup only                                         |
+| `src/app/main.ts`   | state and wiring; the only DOM-heavy file           |
+| `src/app/anchor.ts` | `locate`, the heading breadcrumb, the hash          |
+| `src/app/frame.ts`  | painting and measuring inside the plan's iframe     |
+| `src/app/store.ts`  | `localStorage`, keyed by the plan's path            |
+| `src/app/*.css`     | reviewer chrome, and what is injected into plans    |
+| `src/server.ts`     | routes, the transpile, and the allowlist            |
+| `src/cli.ts`        | the commands, and the URL to open                   |
+| `src/state.ts`      | pid, port and token, at `0600`                      |
+| `src/binary.ts`     | the compile entrypoint: `src/cli.ts` plus that file |
+| `scripts/bundle.ts` | the same app as one file                            |
 
 `frame.ts` takes the plan's `document` as an argument and `store.ts` takes the
 storage object, so neither reaches for a global — which is what makes them
 testable. `anchor.ts` names the comment record the other four share.
 
-`app/plan-css.ts` is the one place the served and bundled builds differ: served,
-it fetches its sibling `plan.css`; bundled, `bundle.ts` swaps it for a module
-returning the same text. Nothing downstream knows which it is running in.
+`src/app/plan-css.ts` is the one place the served and bundled builds differ:
+served, it fetches its sibling `plan.css`; bundled, `scripts/bundle.ts` swaps it
+for a module returning the same text. Nothing downstream knows which it is
+running in.
 
-`server.ts` has the same shape either way. Compiled it is handed the page and
-serves it from memory; from the checkout it serves `app/` off the disk, which
-is the only reason the transpile exists.
+`src/server.ts` has the same shape either way. Compiled it is handed the page
+and serves it from memory; from the checkout it serves `src/` off the disk,
+which is the only reason the transpile exists.
 
 ## Develop
 

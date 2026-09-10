@@ -1,6 +1,6 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { sectionFor } from "../app/anchor.js";
+import { sectionFor } from "../src/app/anchor.js";
 
 // Offsets stand in for a plan whose h2/h3 structure is what matters here.
 const HEADINGS = [

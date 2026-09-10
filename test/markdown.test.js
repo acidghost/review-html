@@ -1,6 +1,6 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { markdown } from "../app/markdown.js";
+import { markdown } from "../src/app/markdown.js";
 
 const comment = (over) => ({
   section: "Design",

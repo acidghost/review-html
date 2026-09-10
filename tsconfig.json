@@ -7,7 +7,7 @@
     "types": ["bun"],
 
     // Bun runs the sources as they are, so nothing here emits; that is also
-    // what lets the test files import "../server.ts" by its real name.
+    // what lets the test files import "../src/server.ts" by its real name.
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
@@ -16,5 +16,5 @@
     "skipLibCheck": true
   },
   // The tests stay JavaScript and need no types of their own.
-  "include": ["binary.ts", "bundle.ts", "cli.ts", "server.ts", "state.ts", "app"]
+  "include": ["src", "scripts"]
 }

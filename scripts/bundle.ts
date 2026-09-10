@@ -10,8 +10,9 @@ import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { BunPlugin } from "bun";
 
-const HERE = import.meta.dir;
-const OUT = join(HERE, "dist", "review.html");
+// The tool lives in scripts/, so the repo root is one up.
+const ROOT = join(import.meta.dir, "..");
+const OUT = join(ROOT, "dist", "review.html");
 
 /* app/plan-css.ts fetches its own sibling, which a single file does not have.
    Swapping the module is what keeps that difference out of main.ts. */
@@ -28,13 +29,13 @@ const inlinePlanCss = (css: string): BunPlugin => ({
 // An inline script ends at the first `</script`, wherever it appears.
 const inlineable = (js: string) => js.replaceAll("</script", "<\\/script");
 
-const read = (path: string) => Bun.file(join(HERE, path)).text();
+const read = (path: string) => Bun.file(join(ROOT, path)).text();
 
 export const bundle = async () => {
   const built = await Bun.build({
-    entrypoints: [join(HERE, "app/main.ts")],
+    entrypoints: [join(ROOT, "src/app/main.ts")],
     target: "browser",
-    plugins: [inlinePlanCss(await read("app/plan.css"))],
+    plugins: [inlinePlanCss(await read("src/app/plan.css"))],
   });
   if (!built.success) throw new AggregateError(built.logs, "bundle failed");
   if (built.outputs.length !== 1) {
@@ -42,10 +43,10 @@ export const bundle = async () => {
   }
 
   const js = await built.outputs[0].text();
-  const shell = await read("review.html");
+  const shell = await read("src/review.html");
   const styled = shell.replace(
     '<link rel="stylesheet" href="app/review.css">',
-    `<style>\n${await read("app/review.css")}    </style>`,
+    `<style>\n${await read("src/app/review.css")}    </style>`,
   );
   const page = styled.replace(
     '<script type="module" src="app/main.js"></script>',

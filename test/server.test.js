@@ -5,14 +5,14 @@ import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { serve, TOKEN_HEADER } from "../server.ts";
+import { serve, TOKEN_HEADER } from "../src/server.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PLAN = `${ROOT}test/fixtures/plan.html`;
 const TOKEN = "a-token";
 
 const allow = new Set();
-const server = serve({ app: ROOT, port: 0, token: TOKEN, allow });
+const server = serve({ app: `${ROOT}src`, port: 0, token: TOKEN, allow });
 const get = (path, init) => server.fetch(new Request(`http://x${path}`, init));
 const plan = (path) => get(`/plan?path=${encodeURIComponent(path)}`);
 const post = (path, headers) =>
@@ -107,7 +107,7 @@ test("a plan is asked for by absolute path, and 404s once it is gone", async () 
 
   const gone = `${ROOT}test/fixtures/gone.html`;
   const registered = new Set([gone]);
-  const other = serve({ app: ROOT, port: 0, allow: registered });
+  const other = serve({ app: `${ROOT}src`, port: 0, allow: registered });
   assert.equal(
     (
       await other.fetch(
@@ -124,7 +124,7 @@ test("a plan is asked for by absolute path, and 404s once it is gone", async () 
    would put back the "plans must live under one root" it replaces. */
 test("a ceiling narrows what may be registered", async () => {
   const bounded = serve({
-    app: ROOT,
+    app: `${ROOT}src`,
     port: 0,
     token: TOKEN,
     ceiling: `${ROOT}test`,

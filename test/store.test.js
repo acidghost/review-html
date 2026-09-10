@@ -1,6 +1,6 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { keyFor, read, write } from "../app/store.js";
+import { keyFor, read, write } from "../src/app/store.js";
 
 // Enough of the Storage interface for store.ts: it only indexes and gets/sets.
 const fakeStorage = (entries = {}) => {

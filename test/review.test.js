@@ -5,8 +5,8 @@
 
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { shorten } from "../app/paths.js";
-import { reviewUrl } from "../cli.ts";
+import { shorten } from "../src/app/paths.js";
+import { reviewUrl } from "../src/cli.ts";
 
 test("with no plan there is no query string", () => {
   assert.equal(reviewUrl({ port: 8422 }), "http://127.0.0.1:8422/review.html");

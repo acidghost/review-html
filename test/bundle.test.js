@@ -4,7 +4,7 @@
 
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { bundle } from "../bundle.ts";
+import { bundle } from "../scripts/bundle.ts";
 
 const page = await bundle();
 

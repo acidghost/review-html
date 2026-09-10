@@ -11,12 +11,12 @@ import { mkdtempSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ping } from "../server.ts";
-import { clear, read } from "../state.ts";
+import { ping } from "../src/server.ts";
+import { clear, read } from "../src/state.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PLAN = `${ROOT}test/fixtures/plan.html`;
-const CLI = `${ROOT}cli.ts`;
+const CLI = `${ROOT}src/cli.ts`;
 const PORT = 8523;
 const STATE = join(mkdtempSync(join(tmpdir(), "review-html-")), "state.json");
 

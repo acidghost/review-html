@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { clear, read, write } from "../state.ts";
+import { clear, read, write } from "../src/state.ts";
 
 // Never the real one: a test must not clobber a running server's state.
 const FILE = join(mkdtempSync(join(tmpdir(), "review-html-")), "d", "s.json");

@@ -1,5 +1,5 @@
 port := "8422"
-cli := "bun run " + justfile_directory() + "/cli.ts --port " + port
+cli := "bun run " + justfile_directory() + "/src/cli.ts --port " + port
 
 # Open the reviewer with no plan loaded, ready for a dropped file
 open:
@@ -28,12 +28,12 @@ demo:
 
 # Build dist/review.html: the whole reviewer in one file, openable from Finder
 bundle:
-    bun run {{ justfile_directory() }}/bundle.ts
+    bun run {{ justfile_directory() }}/scripts/bundle.ts
 
 # Compile the standalone binary. ~60MB of it is the bun runtime.
 build: bundle
     bun build --compile --outfile {{ justfile_directory() }}/dist/review-html \
-      {{ justfile_directory() }}/binary.ts
+      {{ justfile_directory() }}/src/binary.ts
 
 # Put it on PATH, where it needs neither this checkout nor bun
 install: build
@@ -44,10 +44,10 @@ test:
     bun test
 
 fmt:
-    biome check --write *.ts app test review.html
+    biome check --write src scripts test
 
 check: typecheck
-    biome check *.ts app test review.html
+    biome check src scripts test
 
 # node_modules/.bin rather than bunx, which would reach for the registry if the
 # devDependency were missing instead of saying so
