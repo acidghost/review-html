@@ -124,6 +124,19 @@ const deleteComment = (id: string) => {
   queueSave();
 };
 
+/* One confirm for the lot: emptying the sidebar is the one action here that
+   cannot be undone from the UI, and per-card confirms would not make it any
+   less so. */
+const clearComments = () => {
+  const n = written().length;
+  if (!n || !confirm(`Delete all ${n} comment${n === 1 ? "" : "s"}?`)) return;
+  for (const c of comments) unpaint(doc, c.id);
+  comments = [];
+  active = null;
+  render();
+  queueSave();
+};
+
 const setActive = (id: string | null) => {
   active = id;
   for (const card of $("cards").children) {
@@ -240,6 +253,7 @@ const refreshCount = () => {
   $("count").textContent = doc ? `${n} comment${n === 1 ? "" : "s"}` : "";
   $<HTMLButtonElement>("exportBtn").disabled = n === 0;
   $<HTMLButtonElement>("jsonBtn").disabled = n === 0;
+  $<HTMLButtonElement>("clearBtn").disabled = n === 0;
 };
 
 /* ---------- re-anchoring ---------- */
@@ -532,6 +546,7 @@ $("openBtn").addEventListener("click", () => $("file").click());
 $("file").addEventListener("change", (e) =>
   openFile((e.target as HTMLInputElement).files?.[0]),
 );
+$("clearBtn").addEventListener("click", clearComments);
 $("jsonBtn").addEventListener("click", saveJSON);
 $("exportBtn").addEventListener("click", showExport);
 $("mdBtn").addEventListener("click", saveMarkdown);

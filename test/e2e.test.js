@@ -299,6 +299,28 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     );
   });
 
+  test("Clear all empties the sidebar and the plan's highlights", async () => {
+    const page = await open();
+    const frame = await planFrame(page);
+
+    await select(frame, "This sentence exists", "a selection can start");
+    await comment(page, "first");
+    await select(frame, "A second paragraph", "the far end");
+    await comment(page, "second");
+    assert.equal(await page.locator(".card").count(), 2);
+
+    await page.click("#clearBtn");
+
+    assert.equal(await page.locator(".card").count(), 0);
+    assert.equal(await frame.locator("mark[data-comment]").count(), 0);
+    assert.ok(await page.isDisabled("#clearBtn"));
+    // The emptied review must not come back on the next load.
+    await page.waitForTimeout(500); // outlast the 400ms save debounce
+    await page.reload();
+    await planFrame(page);
+    assert.equal(await page.locator(".card").count(), 0);
+  });
+
   test("Esc undoes the current edit instead of wiping the comment", async () => {
     const page = await open();
     const frame = await planFrame(page);
