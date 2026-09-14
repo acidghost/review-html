@@ -4,6 +4,6 @@ lockfile = true
 pin = true
 
 [tools]
-biome = "2.5.11"
+biome = "2.5.12"
 bun = "1.4.0"
 just = "1.58.0"
