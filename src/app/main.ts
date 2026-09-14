@@ -124,17 +124,30 @@ const deleteComment = (id: string) => {
   queueSave();
 };
 
+const discard = (doomed: Comment[]) => {
+  const ids = new Set(doomed.map((c) => c.id));
+  for (const id of ids) unpaint(doc, id);
+  comments = comments.filter((c) => !ids.has(c.id));
+  if (active && ids.has(active)) active = null;
+  render();
+  queueSave();
+};
+
 /* One confirm for the lot: emptying the sidebar is the one action here that
    cannot be undone from the UI, and per-card confirms would not make it any
    less so. */
 const clearComments = () => {
   const n = written().length;
   if (!n || !confirm(`Delete all ${n} comment${n === 1 ? "" : "s"}?`)) return;
-  for (const c of comments) unpaint(doc, c.id);
-  comments = [];
-  active = null;
-  render();
-  queueSave();
+  discard(comments);
+};
+
+const clearOrphans = () => {
+  const lost = orphans();
+  const n = lost.length;
+  if (!n || !confirm(`Delete ${n} unanchored comment${n === 1 ? "" : "s"}?`))
+    return;
+  discard(lost);
 };
 
 const setActive = (id: string | null) => {
@@ -243,6 +256,7 @@ const render = () => {
 };
 
 const written = () => comments.filter((c) => c.body.trim());
+const orphans = () => comments.filter((c) => c.orphan);
 
 const note = (msg: string) => {
   $("note").textContent = msg ? `· ${msg}` : "";
@@ -254,6 +268,7 @@ const refreshCount = () => {
   $<HTMLButtonElement>("exportBtn").disabled = n === 0;
   $<HTMLButtonElement>("jsonBtn").disabled = n === 0;
   $<HTMLButtonElement>("clearBtn").disabled = n === 0;
+  $<HTMLButtonElement>("orphanBtn").disabled = orphans().length === 0;
 };
 
 /* ---------- re-anchoring ---------- */
@@ -546,6 +561,7 @@ $("openBtn").addEventListener("click", () => $("file").click());
 $("file").addEventListener("change", (e) =>
   openFile((e.target as HTMLInputElement).files?.[0]),
 );
+$("orphanBtn").addEventListener("click", clearOrphans);
 $("clearBtn").addEventListener("click", clearComments);
 $("jsonBtn").addEventListener("click", saveJSON);
 $("exportBtn").addEventListener("click", showExport);

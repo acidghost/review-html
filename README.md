@@ -84,7 +84,7 @@ Each comment stores the quoted text, 32 characters of context either side, and a
 character offset into the plan's body text. Reopening a revised plan re-finds
 every quote: by offset, then by context, then by nearest match. Quotes that have
 gone are marked unanchored rather than dropped, so a stale comment is visible
-instead of silently lost.
+instead of silently lost. Once read, *Clear unanchored* sweeps them all.
 
 The plan renders in `<iframe sandbox="allow-same-origin">`. Its CSS cannot reach
 the reviewer, its scripts do not run, and the parent can still read selections

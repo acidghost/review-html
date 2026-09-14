@@ -75,7 +75,8 @@ button:disabled {
   cursor: default;
 }
 /* Destructive, like the per-card ×, so it warns rather than accents. */
-#clearBtn:hover:not(:disabled) {
+#clearBtn:hover:not(:disabled),
+#orphanBtn:hover:not(:disabled) {
   border-color: var(--warn);
   color: var(--warn);
 }

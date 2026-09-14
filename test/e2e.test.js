@@ -321,6 +321,41 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     assert.equal(await page.locator(".card").count(), 0);
   });
 
+  test("Clear unanchored drops the orphans and leaves the rest", async () => {
+    const page = await open();
+    const frame = await planFrame(page);
+
+    await select(frame, "This sentence exists", "a selection can start");
+    await comment(page, "about the doomed paragraph");
+    await select(frame, "A second paragraph", "the far end");
+    await comment(page, "about the surviving one");
+
+    // Drop the first anchor's paragraph: its comment has nowhere left to go.
+    const revised = (await readFile(PLAN, "utf8")).replace(
+      /<p>\s*This sentence exists[\s\S]*?<\/p>/,
+      "",
+    );
+    await page.route(
+      (url) => url.pathname === "/plan",
+      (route) => route.fulfill({ contentType: "text/html", body: revised }),
+    );
+    await page.reload();
+    const reanchored = await planFrame(page);
+    assert.match(await page.textContent("#note"), /1 unanchored/);
+    assert.equal(await page.locator(".card.orphan").count(), 1);
+
+    await page.click("#orphanBtn");
+
+    assert.equal(await page.locator(".card").count(), 1);
+    assert.equal(
+      await page.locator(".card textarea").inputValue(),
+      "about the surviving one",
+    );
+    assert.equal(await reanchored.locator("mark[data-comment]").count(), 1);
+    assert.ok(await page.isDisabled("#orphanBtn"));
+    assert.ok(!(await page.isDisabled("#clearBtn")));
+  });
+
   test("Esc undoes the current edit instead of wiping the comment", async () => {
     const page = await open();
     const frame = await planFrame(page);
