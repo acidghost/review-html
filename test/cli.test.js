@@ -12,7 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ping } from "../src/server.ts";
-import { clear, read } from "../src/state.ts";
+import { clear, read, write } from "../src/state.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PLAN = `${ROOT}test/fixtures/plan.html`;
@@ -39,15 +39,17 @@ try {
   console.log(`skipping the lifecycle suite: ${unavailable}`);
 }
 
-const run = (...args) =>
+const runAt = (port, ...args) =>
   Bun.spawnSync(
-    [process.execPath, "run", CLI, "--port", String(PORT), ...args],
+    [process.execPath, "run", CLI, "--port", String(port), ...args],
     {
       env: { ...process.env, REVIEW_STATE: STATE },
       stdout: "pipe",
       stderr: "pipe",
     },
   );
+
+const run = (...args) => runAt(PORT, ...args);
 
 const output = (result) =>
   `${result.stdout.toString()}${result.stderr.toString()}`.trim();
@@ -93,13 +95,72 @@ describe.skipIf(unavailable !== null)("the command line", () => {
     assert.equal(state.port, PORT);
     assert.match(state.token, /^[0-9a-f-]{36}$/);
     assert.equal(statSync(STATE).mode & 0o777, 0o600);
-    // The pid is what stop uses, so it has to be the process that is serving.
     assert.notEqual(state.pid, process.pid);
   });
 
-  /* The state file exists before the socket does, so a /_ping that answers
-     means the token is already readable. Without that ordering, `review-html
-     <plan>` would race its own child. */
+  test("a failed bind leaves the running server's state and token intact", async () => {
+    spawnServer();
+    assert.ok(await serving(true), "never came up");
+    const before = read(STATE);
+
+    const result = run("serve");
+
+    assert.equal(result.exitCode, 1);
+    assert.deepEqual(read(STATE), before);
+    assert.match(output(run("status")), new RegExp(String(before.pid)));
+    assert.equal(await ping(PORT), "ours");
+  });
+
+  test("stop refuses a PID that does not match the server", async () => {
+    spawnServer();
+    assert.ok(await serving(true), "never came up");
+    const recorded = read(STATE);
+    const unrelated = Bun.spawn(
+      [process.execPath, "-e", "setInterval(() => {}, 1000)"],
+      { stdio: ["ignore", "ignore", "ignore"] },
+    );
+
+    try {
+      write({ ...recorded, pid: unrelated.pid }, STATE);
+      const result = run("stop");
+
+      assert.equal(result.exitCode, 1);
+      assert.match(output(result), /state does not match|pid does not match/i);
+      await Bun.sleep(50);
+      assert.equal(
+        unrelated.exitCode,
+        null,
+        "unrelated process must remain alive",
+      );
+      assert.equal(await ping(PORT), "ours", "review server must remain alive");
+    } finally {
+      write(recorded, STATE);
+      if (unrelated.exitCode === null) unrelated.kill();
+      await unrelated.exited;
+    }
+  });
+
+  test("stop on a different port does not clear the active server's state", async () => {
+    spawnServer();
+    assert.ok(await serving(true), "never came up");
+    const before = read(STATE);
+
+    const result = runAt(PORT + 1, "stop");
+
+    assert.equal(result.exitCode, 1);
+    assert.match(
+      output(result),
+      /records (?:a )?server on port|port mismatch/i,
+    );
+    assert.deepEqual(read(STATE), before);
+    assert.equal(await ping(PORT), "ours");
+    runAt(PORT + 1, "status");
+    assert.deepEqual(read(STATE), before);
+  });
+
+  /* The socket binds before state is written, but /_ping stays in its
+     starting state until the token is on disk. That is what keeps `review-html
+     <plan>` from racing its child. */
   test("a plan is registered and then readable, and only then", async () => {
     spawnServer();
     assert.ok(await serving(true));

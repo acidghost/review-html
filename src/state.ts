@@ -21,8 +21,8 @@ export const FILE =
 export type State = { pid: number; port: number; token: string };
 
 /* Written by whoever is serving, and never trusted: the file outlives a
-   server that was killed, so every reader checks the port before believing
-   the pid. Anything malformed reads as absent. */
+   server that was killed. Callers verify its port and authenticated server
+   identity before acting on it. Anything malformed reads as absent. */
 export const read = (file = FILE): State | null => {
   try {
     const { pid, port, token } = JSON.parse(readFileSync(file, "utf8"));

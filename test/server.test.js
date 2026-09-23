@@ -149,6 +149,79 @@ test("status is behind the token too, and lists what is open", async () => {
   assert.deepEqual((await res.json()).plans, [PLAN]);
 });
 
+test("failed binds do not run the on-listening hook", async () => {
+  let listening = 0;
+  const original = serve({
+    port: 0,
+    onListening: () => {
+      listening += 1;
+    },
+  });
+
+  try {
+    assert.equal(listening, 1);
+    assert.equal(
+      await (await original.fetch(new Request("http://x/_ping"))).text(),
+      "review-html",
+    );
+    assert.throws(() =>
+      serve({
+        port: original.port,
+        onListening: () => {
+          listening += 1;
+        },
+      }),
+    );
+    assert.equal(listening, 1);
+    assert.equal(
+      await (await original.fetch(new Request("http://x/_ping"))).text(),
+      "review-html",
+    );
+  } finally {
+    original.stop(true);
+  }
+});
+
+test("shutdown requires the token and asks the server to stop itself", async () => {
+  let shutdownRequested = false;
+  const controlled = serve({
+    port: 0,
+    token: TOKEN,
+    onShutdown: () => {
+      shutdownRequested = true;
+    },
+  });
+  const shutdownRequest = (headers, method = "POST") =>
+    controlled.fetch(
+      new Request("http://x/_shutdown", {
+        method,
+        headers,
+      }),
+    );
+
+  try {
+    assert.equal((await shutdownRequest({})).status, 403);
+    assert.equal(
+      (await shutdownRequest({ [TOKEN_HEADER]: TOKEN }, "GET")).status,
+      405,
+    );
+    assert.equal(shutdownRequested, false);
+
+    const res = await shutdownRequest({ [TOKEN_HEADER]: TOKEN });
+    assert.equal(res.status, 200);
+    assert.equal(await res.text(), "stopping");
+    assert.equal(
+      shutdownRequested,
+      false,
+      "response is returned before shutdown",
+    );
+    await Bun.sleep(75);
+    assert.equal(shutdownRequested, true);
+  } finally {
+    controlled.stop(true);
+  }
+});
+
 /* ---------- compiled: one page, no tree ---------- */
 
 test("an embedded reviewer is served from memory, and nothing else is", async () => {

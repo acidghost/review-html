@@ -61,6 +61,8 @@ export const serve = ({
   allow = new Set<string>(),
   token = "",
   ceiling = "",
+  onListening,
+  onShutdown,
 }: {
   app?: string;
   port?: number;
@@ -70,22 +72,26 @@ export const serve = ({
   /* The plans that may be read. The caller owns it, so a test can populate it
      without going through /_open. */
   allow?: Set<string>;
-  /* Authenticates /_open and /_status. Empty refuses both, which is what a
-     server nobody handed a token should do. */
+  /* Authenticates /_open, /_status and /_shutdown. Empty refuses them, which
+     is what a server nobody handed a token should do. */
   token?: string;
   /* Optional outer bound on what may be registered — REVIEW_ROOT, for someone
      who wants a hard ceiling as well as the allowlist. */
   ceiling?: string;
+  /* Called after the socket binds, before /_ping reports this server as ready. */
+  onListening?: () => void;
+  /* Authenticated shutdown hook; the server owner decides how to exit. */
+  onShutdown?: () => void;
 } = {}) => {
   const appBase = resolve(app);
   const bound = ceiling ? resolve(ceiling) : "";
+  let ready = !onListening;
 
-  /* Registering a file is the one write this server has, so it is the one
-     thing that must be authenticated: a page that could add a path and then
-     read it back would have arbitrary file read. The token comes from a 0600
-     file, which a local CLI can read and a browser cannot — and sending it in
-     a header of our own also puts the request behind a preflight that goes
-     unanswered. */
+  /* Registering a file and stopping the server are authenticated operations.
+     A page that could add a path and then read it back would have arbitrary
+     file read; shutdown is limited to the local CLI too. The token comes from
+     a 0600 file, which a browser cannot read, and the custom header puts these
+     requests behind a preflight that goes unanswered. */
   const open = async (req: Request) => {
     if (!sameToken(req.headers.get(TOKEN_HEADER), token)) return forbidden();
 
@@ -144,7 +150,7 @@ export const serve = ({
     return missing();
   };
 
-  return Bun.serve({
+  const server = Bun.serve({
     hostname: "127.0.0.1",
     port,
     async fetch(req) {
@@ -153,8 +159,18 @@ export const serve = ({
 
       // The health check the CLI uses. It cannot be `/`, which in served mode
       // is a directory and so has nothing to answer with.
-      if (path === "/_ping") return text(MARKER);
+      if (path === "/_ping") {
+        return ready ? text(MARKER) : text("starting", 503);
+      }
 
+      if (path === "/_shutdown") {
+        if (req.method !== "POST") return text("POST only", 405);
+        if (!sameToken(req.headers.get(TOKEN_HEADER), token))
+          return forbidden();
+        if (!onShutdown) return missing();
+        setTimeout(onShutdown, 50);
+        return text("stopping");
+      }
       if (path === "/_open") {
         return req.method === "POST" ? open(req) : text("POST only", 405);
       }
@@ -176,6 +192,15 @@ export const serve = ({
       return serveApp(path);
     },
   });
+
+  try {
+    onListening?.();
+    ready = true;
+  } catch (err) {
+    server.stop(true);
+    throw err;
+  }
+  return server;
 };
 
 export const ping = async (port: number) => {

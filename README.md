@@ -36,7 +36,8 @@ puts the export on the clipboard, *Save .md* writes `<plan>.review.md`.
 Subcommands win the bare word, so a plan named `serve` is reachable as
 `./serve`. The port is fixed at 8422: saved reviews are keyed to the origin,
 and the port is part of that, so a review made on one port would not be found
-on another.
+on another. Only one server is tracked at a time; stop it before starting on a
+different port.
 
 `just review`, `just serve`, `just stop` and `just status` are the same
 commands against the working copy, which is what to use while changing this.
@@ -49,11 +50,13 @@ registers that one file; `/plan?path=…` refuses everything else. So a plan may
 live anywhere, and `~/.ssh/id_rsa` is refused because nobody opened it as a
 plan.
 
-Registering is the one write, so it is the one thing authenticated: `POST
-/_open` wants a token from `~/.cache/review-html/state.json`, which is `0600`
-in a `0700` directory. A local process can read that; a web page cannot, and
-sending it in a header of our own also puts the request behind a preflight
-that goes unanswered.
+Registering a plan and stopping the server are authenticated operations;
+`POST /_open` and `POST /_shutdown` require a token from
+`~/.cache/review-html/state.json`, which is `0600` in a `0700` directory. The
+status endpoint uses the token too. A local process can read it; a web page
+cannot, and sending it in a custom header puts these requests behind a
+preflight that goes unanswered. Shutdown is requested from the server itself;
+the CLI does not signal a PID read from the state file.
 
 Be precise about who that stops. A malicious page you visit can *send* a
 request to `127.0.0.1:8422`, but with no `Access-Control-Allow-Origin` coming

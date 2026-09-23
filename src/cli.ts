@@ -17,7 +17,8 @@ review-html stop     stop the server
 review-html status   what is running, and which plans it will serve
 
   --port <n>   default ${PORT}. Saved reviews are keyed to the origin, so a
-               review made on one port is not found on another.
+               review made on one port is not found on another. One server at
+               a time; stop it before changing ports.
 
 Subcommands win the bare word: a plan named "serve" is reachable as ./serve.`;
 
@@ -39,6 +40,15 @@ const selfCommand = () => {
     : [process.execPath];
 };
 
+const refuseDifferentTrackedPort = (port: number) => {
+  const existing = state.read();
+  if (existing && existing.port !== port) {
+    throw new Error(
+      `review-html already tracks a server on port ${existing.port}; stop it before serving on ${port}`,
+    );
+  }
+};
+
 /* Returns whether it had to start one. Detached, so the shell comes back and
    `review-html stop` is what ends the server. */
 const ensureServing = async (port: number) => {
@@ -47,6 +57,7 @@ const ensureServing = async (port: number) => {
   if (found === "foreign") {
     throw new Error(`port ${port} is answering, but it is not this server`);
   }
+  refuseDifferentTrackedPort(port);
 
   Bun.spawn([...selfCommand(), "serve", "--port", String(port)], {
     stdio: ["ignore", "ignore", "ignore"],
@@ -62,16 +73,55 @@ const ensureServing = async (port: number) => {
 };
 
 const withToken = (port: number, path: string, init?: RequestInit) => {
-  const token = state.read()?.token;
-  if (!token) {
+  const recorded = state.read();
+  if (!recorded?.token) {
     throw new Error(
       `a server is answering on ${port}, but ${state.FILE} holds no token for it; review-html stop, then try again`,
     );
   }
+  if (recorded.port !== port) {
+    throw new Error(
+      `${state.FILE} records a server on port ${recorded.port}, not ${port}`,
+    );
+  }
   return fetch(`http://127.0.0.1:${port}${path}`, {
     ...init,
-    headers: { ...init?.headers, [TOKEN_HEADER]: token },
+    headers: { ...init?.headers, [TOKEN_HEADER]: recorded.token },
   });
+};
+
+type ServerStatus = { pid: number; port: number; plans: string[] };
+
+const isServerStatus = (value: unknown): value is ServerStatus =>
+  typeof value === "object" &&
+  value !== null &&
+  "pid" in value &&
+  typeof value.pid === "number" &&
+  "port" in value &&
+  typeof value.port === "number" &&
+  "plans" in value &&
+  Array.isArray(value.plans) &&
+  value.plans.every((plan) => typeof plan === "string");
+
+const readStatus = async (port: number) => {
+  const res = await withToken(port, "/_status");
+  if (!res.ok) throw new Error(await res.text());
+  const value: unknown = await res.json();
+  if (!isServerStatus(value)) {
+    throw new Error(`invalid server status response from port ${port}`);
+  }
+  return value;
+};
+
+const clearIfCurrent = (expected: state.State) => {
+  const current = state.read();
+  if (
+    current?.pid === expected.pid &&
+    current.port === expected.port &&
+    current.token === expected.token
+  ) {
+    state.clear();
+  }
 };
 
 /* The server serves nothing it was not handed, so this is what makes a plan
@@ -103,20 +153,23 @@ const openPlan = async (plan: string, port: number) => {
 };
 
 const serveHere = (port: number, page: string, ceiling: string) => {
-  const token = randomUUID();
-  /* Recorded before the socket exists, so an answered /_ping implies a
-     readable token; cleared again if the bind then fails. */
-  state.write({ pid: process.pid, port, token });
-  try {
-    const server = serve({ port, page, token, ceiling });
-    console.log(`serving on ${server.url.origin}`);
-  } catch (err) {
-    state.clear();
-    throw err;
-  }
+  refuseDifferentTrackedPort(port);
+
+  const recorded = { pid: process.pid, port, token: randomUUID() };
+  const server = serve({
+    port,
+    page,
+    token: recorded.token,
+    ceiling,
+    onListening: () => state.write(recorded),
+    onShutdown: () => process.kill(process.pid, "SIGTERM"),
+  });
+  console.log(`serving on ${server.url.origin}`);
+
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, () => {
-      state.clear();
+      clearIfCurrent(recorded);
+      server.stop(true);
       process.exit(0);
     });
   }
@@ -124,9 +177,16 @@ const serveHere = (port: number, page: string, ceiling: string) => {
 
 const stop = async (port: number) => {
   const recorded = state.read();
+  if (recorded && recorded.port !== port) {
+    throw new Error(
+      `${state.FILE} records a server on port ${recorded.port}; refusing to stop port ${port}`,
+    );
+  }
+
   if ((await ping(port)) !== "ours") {
     // A file left behind by a server that was killed is not a failure.
-    state.clear();
+    if (recorded) clearIfCurrent(recorded);
+    else state.clear();
     console.log(
       recorded
         ? `nothing listening on ${port}; cleared a stale ${state.FILE}`
@@ -136,37 +196,58 @@ const stop = async (port: number) => {
   }
   if (!recorded) {
     throw new Error(
-      `a server is answering on ${port}, but nothing recorded its pid`,
+      `a server is answering on ${port}, but nothing recorded its identity`,
     );
   }
 
-  process.kill(recorded.pid, "SIGTERM");
+  const status = await readStatus(port);
+  if (status.port !== port || status.pid !== recorded.pid) {
+    throw new Error(
+      `state does not match the server answering on port ${port}; refusing to stop it`,
+    );
+  }
+
+  const res = await withToken(port, "/_shutdown", { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
     if ((await ping(port)) !== "ours") {
-      state.clear();
+      clearIfCurrent(recorded);
       console.log(`stopped ${recorded.pid}`);
       return;
     }
     await Bun.sleep(100);
   }
-  throw new Error(`${recorded.pid} is still answering on ${port}`);
+  throw new Error(`server ${recorded.pid} is still answering on ${port}`);
 };
 
 const status = async (port: number) => {
   const recorded = state.read();
+  if (recorded && recorded.port !== port) {
+    console.log(
+      `not running on ${port}; ${state.FILE} records port ${recorded.port}`,
+    );
+    return;
+  }
   if ((await ping(port)) !== "ours") {
-    if (recorded) state.clear();
+    if (recorded) clearIfCurrent(recorded);
+    else state.clear();
     console.log(
       recorded ? `not running (cleared a stale ${state.FILE})` : "not running",
     );
     return;
   }
 
-  const { pid, plans } = await (await withToken(port, "/_status")).json();
-  console.log(`serving on 127.0.0.1:${port}, pid ${pid}`);
-  for (const plan of plans) console.log(`  ${plan}`);
-  if (!plans.length) console.log("  no plans open for review");
+  const current = await readStatus(port);
+  if (recorded && (current.pid !== recorded.pid || current.port !== port)) {
+    throw new Error(
+      `state does not match the server answering on port ${port}`,
+    );
+  }
+  console.log(`serving on 127.0.0.1:${port}, pid ${current.pid}`);
+  for (const plan of current.plans) console.log(`  ${plan}`);
+  if (!current.plans.length) console.log("  no plans open for review");
 };
 
 /* --port wins; otherwise a recorded server's port, so stop and status find
