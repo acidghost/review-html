@@ -41,8 +41,5 @@ test("a plan with no headings yields no section", () => {
 });
 
 test("an h3 with no h2 above it still names itself", () => {
-  assert.equal(
-    sectionFor([{ level: 3, text: "Orphan", start: 0 }], 10),
-    "Orphan",
-  );
+  assert.equal(sectionFor([{ level: 3, text: "Orphan", start: 0 }], 10), "Orphan");
 });

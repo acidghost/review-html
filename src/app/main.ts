@@ -1,22 +1,9 @@
-import {
-  CONTEXT,
-  type Comment,
-  type Heading,
-  hash,
-  locate,
-  sectionFor,
-  tidy,
-} from "./anchor.js";
+import { CONTEXT, type Comment, type Heading, hash, locate, sectionFor, tidy } from "./anchor.js";
 import { bodyText, measure, paint, readHeadings, unpaint } from "./frame.js";
 import { markdown } from "./markdown.js";
 import { elide, shorten } from "./paths.js";
 import { planCss } from "./plan-css.js";
-import {
-  keyFor,
-  type Review,
-  read as readStore,
-  write as writeStore,
-} from "./store.js";
+import { keyFor, type Review, read as readStore, write as writeStore } from "./store.js";
 
 declare global {
   interface Window {
@@ -50,9 +37,7 @@ let active: string | null = null;
 
 // Show orphans first, since they have no place in the document.
 function sortComments() {
-  return comments.sort(
-    (a, b) => Number(!!b.orphan) - Number(!!a.orphan) || a.start - b.start,
-  );
+  return comments.sort((a, b) => Number(!!b.orphan) - Number(!!a.orphan) || a.start - b.start);
 }
 
 // Removing a focused textarea may not fire blur to discard its empty draft.
@@ -80,10 +65,7 @@ function addComment() {
     start,
     quote,
     prefix: planText.slice(Math.max(0, start - CONTEXT), start),
-    suffix: planText.slice(
-      start + quote.length,
-      start + quote.length + CONTEXT,
-    ),
+    suffix: planText.slice(start + quote.length, start + quote.length + CONTEXT),
     section: sectionFor(headings, start),
     body: "",
   });
@@ -93,9 +75,7 @@ function addComment() {
   hideAdd();
   render();
   queueSave();
-  const box = document.querySelector<HTMLTextAreaElement>(
-    `.card[data-id="${id}"] textarea`,
-  );
+  const box = document.querySelector<HTMLTextAreaElement>(`.card[data-id="${id}"] textarea`);
   box?.focus();
   box?.scrollIntoView({ block: "nearest" });
 }
@@ -139,8 +119,7 @@ function clearComments() {
 function clearOrphans() {
   const lost = orphans();
   const n = lost.length;
-  if (!n || !confirm(`Delete ${n} unanchored comment${n === 1 ? "" : "s"}?`))
-    return;
+  if (!n || !confirm(`Delete ${n} unanchored comment${n === 1 ? "" : "s"}?`)) return;
   discard(lost);
 }
 
@@ -149,8 +128,7 @@ function setActive(id: string | null) {
   for (const card of $("cards").children) {
     card.classList.toggle("active", (card as HTMLElement).dataset.id === id);
   }
-  for (const m of doc?.querySelectorAll<HTMLElement>("mark[data-comment]") ??
-    []) {
+  for (const m of doc?.querySelectorAll<HTMLElement>("mark[data-comment]") ?? []) {
     m.classList.toggle("active", m.dataset.comment === id);
   }
 }
@@ -204,8 +182,7 @@ function render() {
     del.textContent = "×";
     del.title = "Delete comment";
     del.addEventListener("click", () => {
-      if (!c.body.trim() || confirm("Delete this comment?"))
-        deleteComment(c.id);
+      if (!c.body.trim() || confirm("Delete this comment?")) deleteComment(c.id);
     });
     top.append(del);
 
@@ -296,9 +273,7 @@ function restore(saved: Review, exact = true) {
       `restored ${n} comment${n === 1 ? "" : "s"}`,
       lost ? `${lost} unanchored` : "",
       exact ? "" : "matched by filename",
-      saved.path && planPath && saved.path !== planPath
-        ? `saved as ${saved.path}`
-        : "",
+      saved.path && planPath && saved.path !== planPath ? `saved as ${saved.path}` : "",
       saved.name && saved.name !== planName ? `from ${saved.name}` : "",
       saved.hash && saved.hash !== planHash ? "plan has changed since" : "",
     ]
@@ -317,17 +292,15 @@ function snapshot(): Review {
     path: planPath,
     hash: planHash,
     savedAt: new Date().toISOString(),
-    comments: written().map(
-      ({ id, start, quote, prefix, suffix, section, body }) => ({
-        id,
-        start,
-        quote,
-        prefix,
-        suffix,
-        section,
-        body,
-      }),
-    ),
+    comments: written().map(({ id, start, quote, prefix, suffix, section, body }) => ({
+      id,
+      start,
+      quote,
+      prefix,
+      suffix,
+      section,
+      body,
+    })),
   };
 }
 
@@ -401,9 +374,7 @@ async function saveMarkdown() {
     try {
       const handle = await window.showSaveFilePicker({
         suggestedName: name,
-        types: [
-          { description: "Markdown", accept: { "text/markdown": [".md"] } },
-        ],
+        types: [{ description: "Markdown", accept: { "text/markdown": [".md"] } }],
       });
       const stream = await handle.createWritable();
       await stream.write(exportText());
@@ -480,10 +451,7 @@ function loadPlan(html: string, name: string, label = "") {
       // Some browsers throw instead of returning null.
     }
     if (!loaded) {
-      fail(
-        "Cannot read the plan",
-        "This browser blocks access to the sandboxed frame.",
-      );
+      fail("Cannot read the plan", "This browser blocks access to the sandboxed frame.");
       return;
     }
     doc = loaded;
@@ -504,8 +472,7 @@ function loadPlan(html: string, name: string, label = "") {
     doc.addEventListener("selectionchange", onSelect);
     doc.addEventListener("click", onPlanClick);
     // Drag events over the frame never bubble out to us.
-    for (const [type, fn] of Object.entries(DRAG))
-      doc.addEventListener(type, fn);
+    for (const [type, fn] of Object.entries(DRAG)) doc.addEventListener(type, fn);
 
     $("empty").hidden = true;
     $("name").textContent = elide(planLabel);
@@ -551,9 +518,7 @@ function openFile(file: File | undefined) {
 $("add").addEventListener("mousedown", (e) => e.preventDefault());
 $("add").addEventListener("click", addComment);
 $("openBtn").addEventListener("click", () => $("file").click());
-$("file").addEventListener("change", (e) =>
-  openFile((e.target as HTMLInputElement).files?.[0]),
-);
+$("file").addEventListener("change", (e) => openFile((e.target as HTMLInputElement).files?.[0]));
 $("orphanBtn").addEventListener("click", clearOrphans);
 $("clearBtn").addEventListener("click", clearComments);
 $("jsonBtn").addEventListener("click", saveJSON);
@@ -587,8 +552,7 @@ const DRAG: Record<string, (e: Event) => void> = {
     openFile((e as DragEvent).dataTransfer?.files?.[0]);
   },
 };
-for (const [type, fn] of Object.entries(DRAG))
-  window.addEventListener(type, fn);
+for (const [type, fn] of Object.entries(DRAG)) window.addEventListener(type, fn);
 
 // Exposed so a browser suite can drive loading without a real drop.
 const reviewer = {
@@ -613,10 +577,7 @@ async function boot() {
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     loadPlan(await res.text(), plan.split("/").pop() ?? plan, label);
   } catch (err) {
-    fail(
-      `Could not load ${label}`,
-      `${(err as Error).message} — is \`just serve\` running?`,
-    );
+    fail(`Could not load ${label}`, `${(err as Error).message} — is \`just serve\` running?`);
   }
 }
 boot();

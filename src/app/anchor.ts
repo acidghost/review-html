@@ -44,11 +44,7 @@ export function locate(text: string, a: Anchor) {
   }
 
   let best = -1;
-  for (
-    let i = text.indexOf(a.quote);
-    i >= 0;
-    i = text.indexOf(a.quote, i + 1)
-  ) {
+  for (let i = text.indexOf(a.quote); i >= 0; i = text.indexOf(a.quote, i + 1)) {
     if (best < 0 || Math.abs(i - a.start) < Math.abs(best - a.start)) best = i;
   }
   return best;

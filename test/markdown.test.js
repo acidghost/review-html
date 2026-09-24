@@ -13,10 +13,7 @@ function comment(over) {
 
 test("the header names the plan and counts the comments", () => {
   const out = markdown([comment()], "~/path/to/repo/.plans/x.html");
-  assert.match(
-    out,
-    /^Review of `~\/path\/to\/repo\/\.plans\/x\.html` — 1 comment\n/,
-  );
+  assert.match(out, /^Review of `~\/path\/to\/repo\/\.plans\/x\.html` — 1 comment\n/);
 });
 
 test("the count is pluralised", () => {
@@ -35,18 +32,11 @@ test("each comment becomes a numbered block with its section and quote", () => {
     ],
     "x",
   );
-  assert.ok(
-    out.includes(
-      "## 1 · Phase 1 › Storage\n> keyed by path\n\nwhy not the hash?",
-    ),
-  );
+  assert.ok(out.includes("## 1 · Phase 1 › Storage\n> keyed by path\n\nwhy not the hash?"));
 });
 
 test("blocks follow list order", () => {
-  const out = markdown(
-    [comment({ body: "first" }), comment({ body: "second" })],
-    "x",
-  );
+  const out = markdown([comment({ body: "first" }), comment({ body: "second" })], "x");
   assert.ok(out.indexOf("first") < out.indexOf("second"));
   assert.ok(out.includes("## 1 ") && out.includes("## 2 "));
 });
@@ -57,17 +47,11 @@ test("a comment with no section gets no separator", () => {
 });
 
 test("unanchored comments say so, since their quote may no longer exist", () => {
-  assert.match(
-    markdown([comment({ orphan: true })], "x"),
-    /## 1 · Design · unanchored/,
-  );
+  assert.match(markdown([comment({ orphan: true })], "x"), /## 1 · Design · unanchored/);
 });
 
 test("a quote spanning several elements flattens to one blockquote line", () => {
-  const out = markdown(
-    [comment({ quote: "  across\n\n  two   paragraphs \n" })],
-    "x",
-  );
+  const out = markdown([comment({ quote: "  across\n\n  two   paragraphs \n" })], "x");
   assert.ok(out.includes("> across two paragraphs\n"));
 });
 

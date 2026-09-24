@@ -37,8 +37,5 @@ test("long labels keep both ends and land on the limit", () => {
   const out = elide(label, 64);
   assert.equal(out.length, 64);
   assert.ok(out.startsWith("~/work/deep"));
-  assert.ok(
-    out.endsWith("plan.html"),
-    "the filename is the part worth keeping",
-  );
+  assert.ok(out.endsWith("plan.html"), "the filename is the part worth keeping");
 });

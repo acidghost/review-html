@@ -28,9 +28,7 @@ export function reviewUrl({ plan = "", port = PORT } = {}) {
 // Bun needs the script in development; the compiled executable does not.
 function selfCommand() {
   const source = join(import.meta.dir, "cli.ts");
-  return existsSync(source)
-    ? [process.execPath, "run", source]
-    : [process.execPath];
+  return existsSync(source) ? [process.execPath, "run", source] : [process.execPath];
 }
 
 function refuseDifferentTrackedPort(port: number) {
@@ -71,9 +69,7 @@ function withToken(port: number, path: string, init?: RequestInit) {
     );
   }
   if (recorded.port !== port) {
-    throw new Error(
-      `${state.FILE} records a server on port ${recorded.port}, not ${port}`,
-    );
+    throw new Error(`${state.FILE} records a server on port ${recorded.port}, not ${port}`);
   }
   return fetch(`http://127.0.0.1:${port}${path}`, {
     ...init,
@@ -136,9 +132,7 @@ async function openPlan(plan: string, port: number) {
   }
 
   if (await ensureServing(port)) {
-    console.log(
-      `serving on 127.0.0.1:${port} (review-html stop to shut it down)`,
-    );
+    console.log(`serving on 127.0.0.1:${port} (review-html stop to shut it down)`);
   }
   if (file) await register(file, port);
   Bun.spawn(["open", reviewUrl({ plan: file, port })]).unref();
@@ -185,9 +179,7 @@ async function stop(port: number) {
     return;
   }
   if (!recorded) {
-    throw new Error(
-      `a server is answering on ${port}, but nothing recorded its identity`,
-    );
+    throw new Error(`a server is answering on ${port}, but nothing recorded its identity`);
   }
 
   const status = await readStatus(port);
@@ -215,25 +207,19 @@ async function stop(port: number) {
 async function status(port: number) {
   const recorded = state.read();
   if (recorded && recorded.port !== port) {
-    console.log(
-      `not running on ${port}; ${state.FILE} records port ${recorded.port}`,
-    );
+    console.log(`not running on ${port}; ${state.FILE} records port ${recorded.port}`);
     return;
   }
   if ((await ping(port)) !== "ours") {
     if (recorded) clearIfCurrent(recorded);
     else state.clear();
-    console.log(
-      recorded ? `not running (cleared a stale ${state.FILE})` : "not running",
-    );
+    console.log(recorded ? `not running (cleared a stale ${state.FILE})` : "not running");
     return;
   }
 
   const current = await readStatus(port);
   if (recorded && (current.pid !== recorded.pid || current.port !== port)) {
-    throw new Error(
-      `state does not match the server answering on port ${port}`,
-    );
+    throw new Error(`state does not match the server answering on port ${port}`);
   }
   console.log(`serving on 127.0.0.1:${port}, pid ${current.pid}`);
   for (const plan of current.plans) console.log(`  ${plan}`);

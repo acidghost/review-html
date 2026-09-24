@@ -19,11 +19,7 @@ export function bodyText(doc: Document) {
 export function pointAt(doc: Document, target: number) {
   const walk = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
   let seen = 0;
-  for (
-    let n = walk.nextNode() as Text | null;
-    n;
-    n = walk.nextNode() as Text | null
-  ) {
+  for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
     if (seen + n.length > target) return { node: n, offset: target - seen };
     seen += n.length;
   }
@@ -31,12 +27,7 @@ export function pointAt(doc: Document, target: number) {
 }
 
 // Multiple marks may share an id across elements; splitting preserves offsets.
-export function paint(
-  doc: Document,
-  start: number,
-  length: number,
-  id: string,
-) {
+export function paint(doc: Document, start: number, length: number, id: string) {
   const at = pointAt(doc, start);
   if (!at) return false;
 
@@ -46,11 +37,7 @@ export function paint(
 
   const targets: Text[] = [];
   let left = length;
-  for (
-    let n: Text | null = first;
-    n && left > 0;
-    n = walk.nextNode() as Text | null
-  ) {
+  for (let n: Text | null = first; n && left > 0; n = walk.nextNode() as Text | null) {
     if (n.length > left) n.splitText(left);
     if (n.length) targets.push(n);
     left -= n.length;

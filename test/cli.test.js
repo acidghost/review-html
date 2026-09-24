@@ -34,14 +34,11 @@ try {
 }
 
 function runAt(port, ...args) {
-  return Bun.spawnSync(
-    [process.execPath, "run", CLI, "--port", String(port), ...args],
-    {
-      env: { ...process.env, REVIEW_STATE: STATE },
-      stdout: "pipe",
-      stderr: "pipe",
-    },
-  );
+  return Bun.spawnSync([process.execPath, "run", CLI, "--port", String(port), ...args], {
+    env: { ...process.env, REVIEW_STATE: STATE },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
 }
 
 function run(...args) {
@@ -63,13 +60,10 @@ async function serving(want) {
 }
 
 function spawnServer() {
-  const child = Bun.spawn(
-    [process.execPath, "run", CLI, "--port", String(PORT), "serve"],
-    {
-      env: { ...process.env, REVIEW_STATE: STATE },
-      stdio: ["ignore", "ignore", "ignore"],
-    },
-  );
+  const child = Bun.spawn([process.execPath, "run", CLI, "--port", String(PORT), "serve"], {
+    env: { ...process.env, REVIEW_STATE: STATE },
+    stdio: ["ignore", "ignore", "ignore"],
+  });
   child.unref();
   return child;
 }
@@ -113,10 +107,9 @@ describe.skipIf(unavailable !== null)("the command line", () => {
     spawnServer();
     assert.ok(await serving(true), "never came up");
     const recorded = read(STATE);
-    const unrelated = Bun.spawn(
-      [process.execPath, "-e", "setInterval(() => {}, 1000)"],
-      { stdio: ["ignore", "ignore", "ignore"] },
-    );
+    const unrelated = Bun.spawn([process.execPath, "-e", "setInterval(() => {}, 1000)"], {
+      stdio: ["ignore", "ignore", "ignore"],
+    });
 
     try {
       write({ ...recorded, pid: unrelated.pid }, STATE);
@@ -125,11 +118,7 @@ describe.skipIf(unavailable !== null)("the command line", () => {
       assert.equal(result.exitCode, 1);
       assert.match(output(result), /state does not match|pid does not match/i);
       await Bun.sleep(50);
-      assert.equal(
-        unrelated.exitCode,
-        null,
-        "unrelated process must remain alive",
-      );
+      assert.equal(unrelated.exitCode, null, "unrelated process must remain alive");
       assert.equal(await ping(PORT), "ours", "review server must remain alive");
     } finally {
       write(recorded, STATE);
@@ -146,10 +135,7 @@ describe.skipIf(unavailable !== null)("the command line", () => {
     const result = runAt(PORT + 1, "stop");
 
     assert.equal(result.exitCode, 1);
-    assert.match(
-      output(result),
-      /records (?:a )?server on port|port mismatch/i,
-    );
+    assert.match(output(result), /records (?:a )?server on port|port mismatch/i);
     assert.deepEqual(read(STATE), before);
     assert.equal(await ping(PORT), "ours");
     runAt(PORT + 1, "status");
@@ -243,9 +229,7 @@ describe.skipIf(unavailable !== null)("the command line", () => {
       const html = await response.text();
       assert.match(html, /Plan reviewer/);
 
-      const assets = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map(
-        (match) => match[1],
-      );
+      const assets = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map((match) => match[1]);
       assert.ok(assets.length > 0, html);
       let hasClientScript = false;
       for (const path of assets) {
@@ -255,10 +239,7 @@ describe.skipIf(unavailable !== null)("the command line", () => {
         assert.ok(body.length > 0, path);
         if (asset.headers.get("content-type")?.startsWith("text/javascript")) {
           hasClientScript = true;
-          assert.ok(
-            body.includes("mark[data-comment]"),
-            "iframe CSS is embedded",
-          );
+          assert.ok(body.includes("mark[data-comment]"), "iframe CSS is embedded");
         }
       }
       assert.ok(hasClientScript, "the frontend JavaScript is served");

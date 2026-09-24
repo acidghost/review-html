@@ -28,9 +28,7 @@ function record(over) {
 }
 
 function stored(records) {
-  return fakeStorage(
-    Object.fromEntries(records.map(([k, v]) => [k, JSON.stringify(v)])),
-  );
+  return fakeStorage(Object.fromEntries(records.map(([k, v]) => [k, JSON.stringify(v)])));
 }
 
 test("a record under the exact key is an exact match", () => {
@@ -50,11 +48,7 @@ test("a dropped plan finds its review by basename, and says so", () => {
     keyFor("plan.html"),
     "plan.html",
   );
-  assert.equal(
-    found.exact,
-    false,
-    "a shared basename is a weak claim, not an exact one",
-  );
+  assert.equal(found.exact, false, "a shared basename is a weak claim, not an exact one");
   assert.equal(found.data.path, "~/path/to/repo/.plans/plan.html");
 });
 
@@ -114,11 +108,7 @@ test("writing an empty review deletes the record", () => {
   const key = keyFor("~/path/to/repo/.plans/plan.html");
   const storage = stored([[key, record()]]);
   write(storage, key, record({ comments: [] }));
-  assert.equal(
-    storage.has(key),
-    false,
-    "an emptied sidebar must not come back",
-  );
+  assert.equal(storage.has(key), false, "an emptied sidebar must not come back");
 });
 
 test("a corrupt record is skipped, not thrown", () => {

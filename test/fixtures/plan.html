@@ -144,7 +144,7 @@
       (() => {
         const input = document.querySelector("#width input");
         const apply = (rem) =>
-          document.documentElement.style.setProperty("--page", rem + "rem");
+          document.documentElement.style.setProperty("--page", `${rem}rem`);
         try {
           const saved = localStorage.getItem("plan-width");
           if (saved) {

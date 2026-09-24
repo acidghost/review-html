@@ -13,8 +13,7 @@ function anchor(text, quote, context = 32) {
   };
 }
 
-const PLAN =
-  "Intro paragraph. The parser must handle nesting. Then we ship it.";
+const PLAN = "Intro paragraph. The parser must handle nesting. Then we ship it.";
 
 test("unchanged document resolves at the stored offset", () => {
   const a = anchor(PLAN, "must handle nesting");
@@ -55,7 +54,6 @@ test("an anchor at the very start of the document has no prefix to match on", ()
 
 test("quote is re-found even when the surrounding sentence was reworded", () => {
   const a = anchor(PLAN, "must handle nesting");
-  const revised =
-    "Completely different opening. The parser must handle nesting, we decided.";
+  const revised = "Completely different opening. The parser must handle nesting, we decided.";
   assert.equal(locate(revised, a), revised.indexOf("must handle nesting"));
 });

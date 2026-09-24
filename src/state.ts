@@ -1,17 +1,10 @@
-import {
-  chmodSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 // Tests override REVIEW_STATE to avoid touching a real server's state.
 export const FILE =
-  process.env.REVIEW_STATE ??
-  join(homedir(), ".cache", "review-html", "state.json");
+  process.env.REVIEW_STATE ?? join(homedir(), ".cache", "review-html", "state.json");
 
 export type State = { pid: number; port: number; token: string };
 

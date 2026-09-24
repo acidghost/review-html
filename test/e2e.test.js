@@ -47,9 +47,7 @@ function select(frame, from, needle, to = null, endNeedle = null) {
           const i = n.textContent.indexOf(text);
           if (i >= 0) return { node: n, index: i };
         }
-        throw new Error(
-          `no "${text}" under "${el.textContent.trim().slice(0, 40)}"`,
-        );
+        throw new Error(`no "${text}" under "${el.textContent.trim().slice(0, 40)}"`);
       };
       const start = find(element(from), needle);
       const end = to ? find(element(to), endNeedle) : start;
@@ -105,9 +103,7 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     assert.equal(await page.title(), `${LABEL} — Plan reviewer`);
     assert.equal(await frame.locator("h1").textContent(), "Fixture plan");
     assert.deepEqual(
-      await frame.evaluate(() =>
-        [...document.querySelectorAll("h2")].map((h) => h.textContent),
-      ),
+      await frame.evaluate(() => [...document.querySelectorAll("h2")].map((h) => h.textContent)),
       ["Goal", "Context", "Steps", "Verification"],
     );
   });
@@ -116,23 +112,14 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     const page = await open();
     const frame = await planFrame(page);
 
-    const quote = await select(
-      frame,
-      "This sentence exists",
-      "a selection can start",
-    );
+    const quote = await select(frame, "This sentence exists", "a selection can start");
     await comment(page, "why does it exist?");
 
     assert.equal(await frame.locator("mark[data-comment]").count(), 1);
-    assert.equal(
-      await frame.locator("mark[data-comment]").textContent(),
-      quote,
-    );
+    assert.equal(await frame.locator("mark[data-comment]").textContent(), quote);
     // Verify injected CSS reaches the sandboxed frame.
     assert.equal(
-      await frame
-        .locator("mark[data-comment]")
-        .evaluate((m) => getComputedStyle(m).cursor),
+      await frame.locator("mark[data-comment]").evaluate((m) => getComputedStyle(m).cursor),
       "pointer",
     );
 
@@ -162,19 +149,12 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     );
     const ids = await frame.evaluate(
       () =>
-        new Set(
-          [...document.querySelectorAll("mark[data-comment]")].map(
-            (m) => m.dataset.comment,
-          ),
-        ).size,
+        new Set([...document.querySelectorAll("mark[data-comment]")].map((m) => m.dataset.comment))
+          .size,
     );
     assert.equal(ids, 1, "the marks share one comment id");
     assert.equal(await page.locator(".card").count(), 1);
-    assert.equal(
-      (await page.evaluate(() => window.reviewer.markdown())).match(/^## /gm)
-        .length,
-      1,
-    );
+    assert.equal((await page.evaluate(() => window.reviewer.markdown())).match(/^## /gm).length, 1);
   });
 
   test("two comments export in document order with their own sections", async () => {
@@ -197,11 +177,7 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     const page = await open();
     const frame = await planFrame(page);
 
-    const quote = await select(
-      frame,
-      "This sentence exists",
-      "a selection can start",
-    );
+    const quote = await select(frame, "This sentence exists", "a selection can start");
     await comment(page, "still relevant");
 
     const revised = (await readFile(PLAN, "utf8")).replace(
@@ -219,14 +195,8 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     assert.match(await page.textContent("#note"), /restored 1 comment/);
     assert.doesNotMatch(await page.textContent("#note"), /unanchored/);
     assert.match(await page.textContent("#note"), /plan has changed since/);
-    assert.equal(
-      await reanchored.locator("mark[data-comment]").textContent(),
-      quote,
-    );
-    assert.equal(
-      await page.locator(".card textarea").inputValue(),
-      "still relevant",
-    );
+    assert.equal(await reanchored.locator("mark[data-comment]").textContent(), quote);
+    assert.equal(await page.locator(".card textarea").inputValue(), "still relevant");
   });
 
   test("clicking a highlight focuses its card", async () => {
@@ -236,18 +206,12 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     await select(frame, "This sentence exists", "a selection can start");
     await comment(page, "click me");
     await page.locator(".card textarea").blur();
-    assert.notEqual(
-      await page.evaluate(() => document.activeElement.tagName),
-      "TEXTAREA",
-    );
+    assert.notEqual(await page.evaluate(() => document.activeElement.tagName), "TEXTAREA");
 
     await frame.click("mark[data-comment]");
     await page.waitForSelector(".card.active");
     assert.equal(await frame.locator("mark[data-comment].active").count(), 1);
-    assert.equal(
-      await page.evaluate(() => document.activeElement.tagName),
-      "TEXTAREA",
-    );
+    assert.equal(await page.evaluate(() => document.activeElement.tagName), "TEXTAREA");
   });
 
   test("deleting a comment unwraps its highlight", async () => {
@@ -264,15 +228,8 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
       const p = document.querySelectorAll("p")[2];
       return [p.textContent.replace(/\s+/g, " ").trim(), p.childNodes.length];
     });
-    assert.ok(
-      text.startsWith("This sentence exists so a selection can start"),
-      text,
-    );
-    assert.equal(
-      nodes,
-      1,
-      "normalize() should re-join the nodes paint() split",
-    );
+    assert.ok(text.startsWith("This sentence exists so a selection can start"), text);
+    assert.equal(nodes, 1, "normalize() should re-join the nodes paint() split");
   });
 
   test("Clear all empties the sidebar and the plan's highlights", async () => {
@@ -321,10 +278,7 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     await page.click("#orphanBtn");
 
     assert.equal(await page.locator(".card").count(), 1);
-    assert.equal(
-      await page.locator(".card textarea").inputValue(),
-      "about the surviving one",
-    );
+    assert.equal(await page.locator(".card textarea").inputValue(), "about the surviving one");
     assert.equal(await reanchored.locator("mark[data-comment]").count(), 1);
     assert.ok(await page.isDisabled("#orphanBtn"));
     assert.ok(!(await page.isDisabled("#clearBtn")));
@@ -344,11 +298,7 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     await box.pressSequentially(" and this too");
     await box.press("Escape");
 
-    assert.equal(
-      await box.inputValue(),
-      "keep me",
-      "Esc used to clear the whole comment",
-    );
+    assert.equal(await box.inputValue(), "keep me", "Esc used to clear the whole comment");
     assert.equal(await page.locator(".card").count(), 1);
   });
 });

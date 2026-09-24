@@ -1,6 +1,35 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.13/schema.json",
-  "files": { "includes": ["**", "!test/fixtures/**", "!dist/**"] },
-  "html": { "formatter": { "enabled": true } },
-  "formatter": { "indentStyle": "space", "indentWidth": 2 }
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": ["**", "!!**/dist"]
+  },
+  "formatter": {
+    "enabled": true,
+    "useEditorconfig": true,
+    "lineWidth": 100
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended"
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double"
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  }
 }

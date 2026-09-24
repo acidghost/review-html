@@ -108,8 +108,7 @@ export function serve({
 
       if (path === "/_shutdown") {
         if (req.method !== "POST") return text("POST only", 405);
-        if (!sameToken(req.headers.get(TOKEN_HEADER), token))
-          return forbidden();
+        if (!sameToken(req.headers.get(TOKEN_HEADER), token)) return forbidden();
         if (!onShutdown) return missing();
         setTimeout(onShutdown, 50);
         return text("stopping");
@@ -125,8 +124,7 @@ export function serve({
       }
       if (path === "/plan") {
         const asked = url.searchParams.get("path") ?? "";
-        if (!asked.startsWith("/"))
-          return text("plan path must be absolute", 400);
+        if (!asked.startsWith("/")) return text("plan path must be absolute", 400);
         return servePlan(asked);
       }
 
