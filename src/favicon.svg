@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Plan reviewer</title>
+  <rect x="4" y="4" width="56" height="56" rx="13" fill="#2f5fa8"/>
+  <path d="M20 12h17l9 9v31H20z" fill="#fdfdfc"/>
+  <path d="M37 12v9h9" fill="#dbe7f7"/>
+  <path d="M26 29h13M26 36h13" fill="none" stroke="#2f5fa8" stroke-linecap="round" stroke-width="3"/>
+  <path d="m27 44 4 4 9-10" fill="none" stroke="#d99a2f" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+</svg>

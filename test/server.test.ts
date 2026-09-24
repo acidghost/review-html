@@ -52,6 +52,17 @@ test("unmatched static paths are not served from the source tree", async () => {
   assert.equal((await get("/app/review.css")).status, 404);
 });
 
+test("serves the favicon linked from the reviewer", async () => {
+  const page = await (await get("/review.html")).text();
+  const favicon = page.match(/<link rel="icon"[^>]*href="([^"]+)"/)?.[1];
+  assert.ok(favicon, "the page links a favicon");
+
+  const icon = await get(favicon);
+  assert.equal(icon.status, 200);
+  assert.match(icon.headers.get("content-type") ?? "", /^image\/svg\+xml/);
+  assert.match(await icon.text(), /<svg .*viewBox="0 0 64 64">/);
+});
+
 test("answers the health check the CLI uses", async () => {
   assert.equal((await get("/_ping")).status, 200);
 });
