@@ -236,7 +236,7 @@ function orphans() {
 }
 
 function note(msg: string) {
-  $("note").textContent = msg ? `· ${msg}` : "";
+  $("note").textContent = msg;
 }
 
 function refreshCount() {

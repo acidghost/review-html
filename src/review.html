@@ -9,15 +9,20 @@
   <body>
     <header>
       <strong id="name">Plan reviewer</strong>
-      <span id="count" class="muted"></span>
-      <span id="note" class="muted"></span>
-      <span class="spacer"></span>
-      <button type="button" id="plansBtn">Plans</button>
-      <button type="button" id="openBtn">Open…</button>
-      <button type="button" id="orphanBtn" disabled>Clear unanchored</button>
-      <button type="button" id="clearBtn" disabled>Clear all</button>
-      <button type="button" id="jsonBtn" disabled>Save .json</button>
-      <button type="button" id="exportBtn" disabled>Copy Markdown</button>
+      <div class="header-actions">
+        <div class="action-group">
+          <button type="button" id="plansBtn">Plans</button>
+          <button type="button" id="openBtn">Open…</button>
+        </div>
+        <div class="action-group">
+          <button type="button" id="orphanBtn" disabled>Clear unanchored</button>
+          <button type="button" id="clearBtn" disabled>Clear all</button>
+        </div>
+        <div class="action-group">
+          <button type="button" id="jsonBtn" disabled>Save .json</button>
+          <button type="button" id="exportBtn" disabled>Copy Markdown</button>
+        </div>
+      </div>
     </header>
 
     <main>
@@ -30,7 +35,12 @@
           >
         </div>
       </div>
-      <aside>
+      <aside aria-label="Comments">
+        <div class="comments-heading">
+          <h2>Comments</h2>
+          <span id="count" class="muted"></span>
+        </div>
+        <p id="note" class="muted" role="status"></p>
         <p id="none" class="muted">No comments yet.</p>
         <div id="cards"></div>
       </aside>

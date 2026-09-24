@@ -110,6 +110,54 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     );
   });
 
+  test("comments have room beside the document and stack below it on narrow screens", async () => {
+    const page = await open();
+    try {
+      await page.setViewportSize({ width: 1488, height: 900 });
+      const frame = await planFrame(page);
+      await select(frame, "This sentence exists", "a selection can start");
+      await comment(page, "A longer comment should have room to breathe beside the plan.");
+      const wide = await page.evaluate(() => {
+        const plan = document.querySelector("#planpane").getBoundingClientRect();
+        const aside = document.querySelector("aside").getBoundingClientRect();
+        const box = document.querySelector(".card textarea").getBoundingClientRect();
+        const name = document.querySelector("#name").getBoundingClientRect();
+        const actions = document.querySelector(".header-actions").getBoundingClientRect();
+        return {
+          plan: plan.width,
+          aside: aside.width,
+          box: box.width,
+          left: aside.left,
+          nameTop: name.top,
+          actionsTop: actions.top,
+        };
+      });
+      assert.ok(wide.aside >= 450, `comment rail is too narrow: ${wide.aside}px`);
+      assert.ok(wide.plan >= 700, `reading pane is too narrow: ${wide.plan}px`);
+      assert.ok(wide.box >= 380, `comment field is too narrow: ${wide.box}px`);
+      assert.ok(wide.left >= wide.plan - 1, "the sidebar should sit beside the plan");
+      assert.ok(
+        Math.abs(wide.nameTop - wide.actionsTop) < 10,
+        "navigation and review actions should share one toolbar on wide screens",
+      );
+
+      await page.setViewportSize({ width: 700, height: 850 });
+      const narrow = await page.evaluate(() => {
+        const plan = document.querySelector("#planpane").getBoundingClientRect();
+        const aside = document.querySelector("aside").getBoundingClientRect();
+        return {
+          planBottom: plan.bottom,
+          asideTop: aside.top,
+          overflow: document.documentElement.scrollWidth > innerWidth,
+        };
+      });
+      assert.ok(narrow.asideTop >= narrow.planBottom - 1, "comments should stack below the plan");
+      assert.equal(narrow.overflow, false, "the toolbar should not cause horizontal scrolling");
+    } finally {
+      await page.close();
+    }
+  });
+
   test("picker switches plans, keeps reviews, and removes without deleting them", async () => {
     const page = await open();
     try {
