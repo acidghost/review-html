@@ -97,38 +97,32 @@ export function serve({
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port,
-    routes: { "/review.html": homepage },
-    async fetch(req) {
-      const url = new URL(req.url);
-      const path = decodeURIComponent(url.pathname);
-
-      if (path === "/_ping") {
-        return ready ? text(MARKER) : text("starting", 503);
-      }
-
-      if (path === "/_shutdown") {
-        if (req.method !== "POST") return text("POST only", 405);
-        if (!sameToken(req.headers.get(TOKEN_HEADER), token)) return forbidden();
-        if (!onShutdown) return missing();
-        setTimeout(onShutdown, 50);
-        return text("stopping");
-      }
-      if (path === "/_open") {
-        return req.method === "POST" ? open(req) : text("POST only", 405);
-      }
-      if (path === "/_status") {
+    routes: {
+      "/review.html": homepage,
+      "/_ping": () => (ready ? text(MARKER) : text("starting", 503)),
+      "/_shutdown": {
+        POST: (req) => {
+          if (!sameToken(req.headers.get(TOKEN_HEADER), token)) return forbidden();
+          if (!onShutdown) return missing();
+          setTimeout(onShutdown, 50);
+          return text("stopping");
+        },
+      },
+      "/_open": {
+        POST: (req) => open(req),
+      },
+      "/_status": (req) => {
         if (!sameToken(req.headers.get(TOKEN_HEADER), token)) {
           return forbidden();
         }
         return Response.json({ pid: process.pid, port, plans: [...allow] });
-      }
-      if (path === "/plan") {
-        const asked = url.searchParams.get("path") ?? "";
+      },
+      "/plan": (req) => {
+        const asked = new URL(req.url).searchParams.get("path") ?? "";
         if (!asked.startsWith("/")) return text("plan path must be absolute", 400);
         return servePlan(asked);
-      }
-
-      return missing();
+      },
+      "/*": () => missing(),
     },
   });
 
