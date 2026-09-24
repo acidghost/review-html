@@ -86,7 +86,7 @@ test("what may be registered is a plan that exists", async () => {
   assert.equal((await open(`${ROOT}package.json`)).status, 403, "not a plan");
   assert.equal((await open(`${ROOT}test/nope.html`)).status, 404, "not there");
   assert.equal((await open("test/fixtures/plan.html")).status, 400, "relative");
-  assert.equal((await get("/_open")).status, 405, "GET cannot register");
+  assert.equal((await get("/_open")).status, 404, "GET has no registered route");
 });
 
 test("a plan is asked for by absolute path, and 404s once it is gone", async () => {
@@ -145,7 +145,7 @@ test("shutdown requires the token and asks the server to stop itself", async () 
     request(server, "/_shutdown", { method, headers });
 
   assert.equal((await shutdownRequest({})).status, 403);
-  assert.equal((await shutdownRequest({ [TOKEN_HEADER]: TOKEN }, "GET")).status, 405);
+  assert.equal((await shutdownRequest({ [TOKEN_HEADER]: TOKEN }, "GET")).status, 404);
   assert.equal(shutdownRequested, false);
 
   const res = await shutdownRequest({ [TOKEN_HEADER]: TOKEN });
