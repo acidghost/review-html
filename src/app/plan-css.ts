@@ -1,9 +1,5 @@
-/* The stylesheet injected into the plan's iframe, as text.
+/* Imported as text so the Bun HTML build embeds it in the browser bundle;
+   it is injected into the plan iframe rather than linked from the page. */
+import css from "./plan.css" with { type: "text" };
 
-   Served, it fetches its own sibling. Bundled, there is no sibling to fetch:
-   the build replaces this module with one returning the same CSS as a
-   literal. A module of its own rather than a branch in main.ts, so nothing
-   downstream knows which of the two it is running in. */
-
-export const planCss = async () =>
-  (await fetch(new URL("plan.css", import.meta.url))).text();
+export const planCss = async () => css;

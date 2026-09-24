@@ -12,38 +12,16 @@ const PLAN = `${ROOT}test/fixtures/plan.html`;
 const TOKEN = "a-token";
 
 const allow = new Set();
-const server = serve({ app: `${ROOT}src`, port: 0, token: TOKEN, allow });
+const server = serve({ port: 0, token: TOKEN, allow });
 const get = (path, init) => server.fetch(new Request(`http://x${path}`, init));
 const plan = (path) => get(`/plan?path=${encodeURIComponent(path)}`);
 const post = (path, headers) =>
   get("/_open", { method: "POST", body: JSON.stringify({ path }), headers });
 const open = (path) => post(path, { [TOKEN_HEADER]: TOKEN });
 
-test("serves the reviewer and its modules with usable content types", async () => {
-  for (const [path, type] of [
-    ["/review.html", "text/html"],
-    ["/app/main.js", "text/javascript"],
-    ["/app/review.css", "text/css"],
-  ]) {
-    const res = await get(path);
-    assert.equal(res.status, 200, path);
-    // A wrong type on .js blocks module loading outright.
-    assert.match(res.headers.get("content-type"), new RegExp(`^${type}`), path);
-  }
-});
-
-/* The transpile has one job on the way out, and one thing it must not do:
-   take the types off, and leave every specifier alone. The browser resolves
-   `./anchor.js` itself, so a rewritten one is a 404 it cannot recover from. */
-test("app modules arrive as JavaScript with their specifiers intact", async () => {
-  const main = await get("/app/main.js");
-  const body = await main.text();
-  assert.match(main.headers.get("content-type"), /^text\/javascript/);
-  assert.ok(body.includes('from "./anchor.js"'), body.slice(0, 200));
-  assert.ok(!body.includes("Document | null"), "annotations should be gone");
-
-  const anchor = await (await get("/app/anchor.js")).text();
-  assert.ok(!anchor.includes("export type"), "type exports should be gone");
+test("unmatched static paths are not served from the source tree", async () => {
+  assert.equal((await get("/app/main.js")).status, 404);
+  assert.equal((await get("/app/review.css")).status, 404);
 });
 
 test("answers the health check the CLI uses", async () => {
@@ -53,18 +31,6 @@ test("answers the health check the CLI uses", async () => {
 test("a missing file, and the root directory, are both 404", async () => {
   assert.equal((await get("/nope.html")).status, 404);
   assert.equal((await get("/")).status, 404);
-});
-
-/* `new URL()` folds plain ".." away before the handler sees it, so an encoded
-   slash is the traversal that actually reaches the containment check. */
-test("encoded traversal out of the app tree is refused", async () => {
-  for (const path of [
-    "/%2e%2e%2f%2e%2e%2fetc%2fpasswd",
-    "/app%2f%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd",
-  ]) {
-    assert.equal((await get(path)).status, 403, path);
-  }
-  assert.equal((await get("/../../etc/passwd")).status, 404);
 });
 
 /* ---------- the boundary ---------- */
@@ -107,7 +73,7 @@ test("a plan is asked for by absolute path, and 404s once it is gone", async () 
 
   const gone = `${ROOT}test/fixtures/gone.html`;
   const registered = new Set([gone]);
-  const other = serve({ app: `${ROOT}src`, port: 0, allow: registered });
+  const other = serve({ port: 0, allow: registered });
   assert.equal(
     (
       await other.fetch(
@@ -124,7 +90,6 @@ test("a plan is asked for by absolute path, and 404s once it is gone", async () 
    would put back the "plans must live under one root" it replaces. */
 test("a ceiling narrows what may be registered", async () => {
   const bounded = serve({
-    app: `${ROOT}src`,
     port: 0,
     token: TOKEN,
     ceiling: `${ROOT}test`,
@@ -220,20 +185,4 @@ test("shutdown requires the token and asks the server to stop itself", async () 
   } finally {
     controlled.stop(true);
   }
-});
-
-/* ---------- compiled: one page, no tree ---------- */
-
-test("an embedded reviewer is served from memory, and nothing else is", async () => {
-  const compiled = serve({ port: 0, page: "<!doctype html><b>embedded" });
-  const at = (path) => compiled.fetch(new Request(`http://x${path}`));
-
-  const res = await at("/review.html");
-  assert.equal(res.status, 200);
-  assert.match(res.headers.get("content-type"), /^text\/html/);
-  assert.ok((await res.text()).includes("embedded"));
-
-  assert.equal((await at("/app/main.js")).status, 404, "no source tree");
-  assert.equal((await at("/_ping")).status, 200, "still ours");
-  compiled.stop(true);
 });

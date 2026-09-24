@@ -22,18 +22,16 @@ stop:
 status:
     {{ cli }} status
 
-# Open the bundled fixture plan
+# Open the fixture plan
 demo:
     just review test/fixtures/plan.html
 
-# Build dist/review.html: the whole reviewer in one file, openable from Finder
-bundle:
-    bun run {{ justfile_directory() }}/scripts/bundle.ts
-
-# Compile the standalone binary. ~60MB of it is the bun runtime.
-build: bundle
-    bun build --compile --outfile {{ justfile_directory() }}/dist/review-html \
-      {{ justfile_directory() }}/src/binary.ts
+# Compile the server and its HTML/CSS/TypeScript assets into one executable.
+build:
+    mkdir -p {{ justfile_directory() }}/dist
+    bun build --compile --no-compile-autoload-dotenv \
+      --outfile {{ justfile_directory() }}/dist/review-html \
+      {{ justfile_directory() }}/src/cli.ts
 
 # Put it on PATH, where it needs neither this checkout nor bun
 install: build
@@ -44,10 +42,10 @@ test:
     bun test
 
 fmt:
-    biome check --write src scripts test
+    biome check --write src test
 
 check: typecheck
-    biome check src scripts test
+    biome check src test
 
 # node_modules/.bin rather than bunx, which would reach for the registry if the
 # devDependency were missing instead of saying so

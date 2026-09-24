@@ -1,7 +1,6 @@
 #!/usr/bin/env bun
-/* The command line: open a plan for review, and start or stop the server it
-   is opened on. This is the compile entrypoint's other half — see binary.ts,
-   which adds the embedded reviewer and nothing else. */
+/* The CLI and executable entry point. Bun's HTML-aware import in server.ts
+   brings the reviewer and its browser assets into the compiled binary. */
 
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -30,9 +29,8 @@ export const reviewUrl = ({ plan = "", port = PORT } = {}) => {
   return url.href;
 };
 
-/* How to run ourselves again. Compiled there is no source tree to hand back
-   to bun — the binary is the interpreter, and import.meta.dir points inside
-   it — whereas in development the interpreter needs the script named. */
+/* How to run ourselves again. In development Bun needs the script named;
+   compiled, the executable starts itself with the requested command. */
 const selfCommand = () => {
   const source = join(import.meta.dir, "cli.ts");
   return existsSync(source)
@@ -152,13 +150,12 @@ const openPlan = async (plan: string, port: number) => {
   Bun.spawn(["open", reviewUrl({ plan: file, port })]).unref();
 };
 
-const serveHere = (port: number, page: string, ceiling: string) => {
+const serveHere = (port: number, ceiling: string) => {
   refuseDifferentTrackedPort(port);
 
   const recorded = { pid: process.pid, port, token: randomUUID() };
   const server = serve({
     port,
-    page,
     token: recorded.token,
     ceiling,
     onListening: () => state.write(recorded),
@@ -255,7 +252,7 @@ const status = async (port: number) => {
 const recordedPort = (given: string | undefined) =>
   given ? Number(given) : (state.read()?.port ?? PORT);
 
-export const main = async ({ page = "" } = {}) => {
+export const main = async () => {
   const { values, positionals } = parseArgs({
     options: {
       port: { type: "string" },
@@ -271,7 +268,7 @@ export const main = async ({ page = "" } = {}) => {
     if (extra.length) throw new Error("one plan at a time");
 
     if (command === "serve") {
-      return serveHere(port, page, process.env.REVIEW_ROOT ?? "");
+      return serveHere(port, process.env.REVIEW_ROOT ?? "");
     }
     if (command === "stop") return await stop(recordedPort(values.port));
     if (command === "status") return await status(recordedPort(values.port));

@@ -7,7 +7,7 @@
 
 import { afterEach, beforeAll, describe, test } from "bun:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, statSync } from "node:fs";
+import { mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -222,5 +222,62 @@ describe.skipIf(unavailable !== null)("the command line", () => {
     const result = run("a.html", "b.html");
     assert.equal(result.exitCode, 1);
     assert.match(output(result), /one plan at a time/);
+  });
+
+  test("the compiled server serves its HTML page and bundled assets", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "review-html-build-"));
+    const executable = join(dir, "review-html");
+    let compiled;
+
+    try {
+      const built = await Bun.build({
+        entrypoints: [CLI],
+        compile: { outfile: executable, autoloadDotenv: false },
+      });
+      assert.ok(built.success, built.logs.map((log) => log.message).join("\n"));
+
+      compiled = Bun.spawn([executable, "--port", String(PORT), "serve"], {
+        env: { ...process.env, REVIEW_STATE: STATE },
+        stdout: "ignore",
+        stderr: "pipe",
+      });
+      assert.ok(await serving(true), "compiled server never came up");
+
+      const response = await fetch(`http://127.0.0.1:${PORT}/review.html`);
+      assert.equal(response.status, 200);
+      const html = await response.text();
+      assert.match(html, /Plan reviewer/);
+
+      const assets = [...html.matchAll(/(?:src|href)="([^"]+)"/g)].map(
+        (match) => match[1],
+      );
+      assert.ok(assets.length > 0, html);
+      let hasClientScript = false;
+      for (const path of assets) {
+        const asset = await fetch(new URL(path, `http://127.0.0.1:${PORT}`));
+        assert.equal(asset.status, 200, path);
+        const body = await asset.text();
+        assert.ok(body.length > 0, path);
+        if (asset.headers.get("content-type")?.startsWith("text/javascript")) {
+          hasClientScript = true;
+          assert.ok(
+            body.includes("mark[data-comment]"),
+            "iframe CSS is embedded",
+          );
+        }
+      }
+      assert.ok(hasClientScript, "the frontend JavaScript is served");
+
+      assert.match(output(run("stop")), /^stopped \d+$/);
+      assert.ok(await serving(false), "compiled server did not stop");
+      await compiled.exited;
+    } finally {
+      run("stop");
+      if (compiled?.exitCode === null) {
+        compiled.kill();
+        await compiled.exited;
+      }
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

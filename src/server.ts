@@ -1,29 +1,17 @@
 #!/usr/bin/env bun
-/* Serves the reviewer on loopback, and the plans it has been handed.
-
-   Two namespaces, because they are two different things. The reviewer's own
-   files come off this checkout at a fixed /review.html — or, compiled, out of
-   the binary as one page. Plans are read through /plan?path=<absolute>, and
-   only the ones something authenticated has registered.
+/* Serves the Bun-bundled reviewer on loopback, and the plans it has been
+   handed. Plans are read through /plan?path=<absolute>, and only the ones
+   something authenticated has registered.
 
    That allowlist is the boundary. A malicious web page can send a request
    here but cannot read the response, because no Access-Control-Allow-Origin
    comes back; the same-origin policy does that work. What the allowlist stops
    is a local reader — any other process on the machine can curl loopback and
-   read whatever it is given, and CORS has nothing to say about that.
-
-   Static, plus a transpile: the reviewer is plain ES modules written in
-   TypeScript, so the browser asks for one file per module and each is stripped
-   of its types on the way out. */
+   read whatever it is given, and CORS has nothing to say about that. */
 
 import { timingSafeEqual } from "node:crypto";
 import { resolve, sep } from "node:path";
-
-// Types only ever come off; no target lowering, no bundling, no import
-// rewriting — `./anchor.js` reaches the browser exactly as written.
-const strip = new Bun.Transpiler({ loader: "ts" });
-
-export const APP = import.meta.dir;
+import homepage from "./review.html";
 
 /* Fixed, and not a preference: localStorage is partitioned by origin and the
    port is part of the origin, so a port per invocation would orphan every
@@ -40,10 +28,6 @@ const under = (path: string, base: string) =>
   path === base || path.startsWith(base + sep);
 
 const text = (body: string, status = 200) => new Response(body, { status });
-const html = (body: string) =>
-  new Response(body, {
-    headers: { "Content-Type": "text/html;charset=utf-8" },
-  });
 const forbidden = () => text("forbidden", 403);
 const missing = () => text("not found", 404);
 
@@ -55,20 +39,14 @@ const sameToken = (given: string | null, token: string) =>
   timingSafeEqual(Buffer.from(given), Buffer.from(token));
 
 export const serve = ({
-  app = APP,
   port = PORT,
-  page = "",
   allow = new Set<string>(),
   token = "",
   ceiling = "",
   onListening,
   onShutdown,
 }: {
-  app?: string;
   port?: number;
-  /* The reviewer as one page. Set in a compiled binary, which has no source
-     tree to serve; empty means serve app/ off the disk. */
-  page?: string;
   /* The plans that may be read. The caller owns it, so a test can populate it
      without going through /_open. */
   allow?: Set<string>;
@@ -83,7 +61,6 @@ export const serve = ({
   /* Authenticated shutdown hook; the server owner decides how to exit. */
   onShutdown?: () => void;
 } = {}) => {
-  const appBase = resolve(app);
   const bound = ceiling ? resolve(ceiling) : "";
   let ready = !onListening;
 
@@ -124,35 +101,10 @@ export const serve = ({
     return (await found.exists()) ? new Response(found) : missing();
   };
 
-  const serveApp = async (path: string) => {
-    // `.${path}` keeps the resolve inside base for well-behaved paths; the
-    // prefix test is what catches the rest, including symlinks' parents.
-    const file = resolve(appBase, `.${path}`);
-    if (!under(file, appBase)) return forbidden();
-
-    // Content-Type is inferred from the extension, which is the only header
-    // that matters here: a wrong one on .js blocks module loading outright.
-    const found = Bun.file(file);
-    if (await found.exists()) return new Response(found);
-
-    /* The app's import specifiers say `.js`, because that is what a browser
-       must be given; the file on disk is `.ts`. Checked only after the plain
-       file misses, so a real .js still wins and needs no transpile. */
-    if (file.endsWith(".js")) {
-      const source = Bun.file(`${file.slice(0, -3)}.ts`);
-      if (await source.exists()) {
-        return new Response(strip.transformSync(await source.text()), {
-          headers: { "Content-Type": "text/javascript;charset=utf-8" },
-        });
-      }
-    }
-
-    return missing();
-  };
-
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port,
+    routes: { "/review.html": homepage },
     async fetch(req) {
       const url = new URL(req.url);
       const path = decodeURIComponent(url.pathname);
@@ -187,9 +139,7 @@ export const serve = ({
         return servePlan(asked);
       }
 
-      // Compiled, the reviewer is one page in memory and there is no tree.
-      if (page) return path === "/review.html" ? html(page) : missing();
-      return serveApp(path);
+      return missing();
     },
   });
 

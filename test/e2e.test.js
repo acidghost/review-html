@@ -9,11 +9,8 @@
 
 import { afterAll, beforeAll, describe, test } from "bun:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { bundle } from "../scripts/bundle.ts";
 import { shorten } from "../src/app/paths.js";
 import { serve } from "../src/server.ts";
 
@@ -103,7 +100,7 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
   beforeAll(() => {
     // Port 0: a fixed one would collide with a server left running.
     // The fixture is handed over directly, since /_open is the CLI's job.
-    server = serve({ app: `${ROOT}src`, port: 0, allow: new Set([PLAN]) });
+    server = serve({ port: 0, allow: new Set([PLAN]) });
     origin = server.url.origin;
   });
 
@@ -377,75 +374,5 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
       "Esc used to clear the whole comment",
     );
     assert.equal(await page.locator(".card").count(), 1);
-  });
-});
-
-/* The single file, over file://. This is the guard against the served and
-   bundled reviewers drifting apart, so it builds its own bundle rather than
-   trusting that `just bundle` has been run. */
-describe.skipIf(unavailable !== null)("bundled reviewer over file://", () => {
-  let page;
-
-  beforeAll(async () => {
-    const dir = await mkdtemp(join(tmpdir(), "review-html-"));
-    const file = join(dir, "review.html");
-    await writeFile(file, await bundle());
-
-    const context = await browser.newContext();
-    page = await context.newPage();
-    page.on("dialog", (d) => d.accept());
-    await page.goto(`file://${file}`);
-  });
-
-  // The plan has to be handed over, since a file:// page cannot fetch one.
-  const load = async () => {
-    await page.waitForFunction(() => window.reviewer);
-    const html = await readFile(PLAN, "utf8");
-    await page.evaluate(
-      (text) => window.reviewer.loadPlan(text, "plan.html"),
-      html,
-    );
-    return planFrame(page);
-  };
-
-  test("a comment survives a reload of the page opened from disk", async () => {
-    const frame = await load();
-    assert.equal(await frame.locator("h1").textContent(), "Fixture plan");
-
-    const quote = await select(
-      frame,
-      "This sentence exists",
-      "a selection can start",
-    );
-    await comment(page, "written with no server");
-
-    // plan.css is a literal in this build; this is where that is proven.
-    assert.equal(
-      await frame
-        .locator("mark[data-comment]")
-        .evaluate((m) => getComputedStyle(m).cursor),
-      "pointer",
-    );
-
-    await page.reload();
-    const reloaded = await load();
-    assert.match(await page.textContent("#note"), /restored 1 comment/);
-    assert.equal(
-      await reloaded.locator("mark[data-comment]").textContent(),
-      quote,
-    );
-    assert.equal(
-      await page.locator(".card textarea").inputValue(),
-      "written with no server",
-    );
-  });
-
-  test("a plan named in the query string says why it cannot be read", async () => {
-    const url = page.url();
-    await page.goto(`${url}?plan=${encodeURIComponent(PLAN)}`);
-    await page.waitForFunction(() => !document.getElementById("empty").hidden);
-    const empty = await page.textContent("#empty");
-    assert.match(empty, /Cannot open .* from a file/);
-    assert.match(empty, /Drop the plan in/);
   });
 });

@@ -498,8 +498,7 @@ const loadPlan = (html: string, name: string, label = "") => {
     for (const s of doc.querySelectorAll("script")) s.remove();
     doc.querySelector("#width")?.remove();
 
-    // Text, not a <link>: srcdoc has no useful base URL of its own, and a
-    // bundled reviewer has no sibling stylesheet to point one at.
+    // Text, not a <link>: srcdoc has no useful base URL of its own.
     const style = doc.createElement("style");
     style.textContent = planStyles;
     doc.head.append(style);
@@ -617,13 +616,6 @@ const boot = async () => {
   if (!plan) return;
 
   const label = shorten(plan);
-  // A file:// page may not read another file, so there is nothing to try.
-  if (location.protocol === "file:") {
-    return fail(
-      `Cannot open ${label} from a file`,
-      "This reviewer was opened from disk, so it cannot fetch a plan by path. Drop the plan in instead.",
-    );
-  }
   try {
     const res = await fetch(`/plan?path=${encodeURIComponent(plan)}`);
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
