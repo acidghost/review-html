@@ -208,7 +208,7 @@ describe.skipIf(unavailable !== null)("the command line", () => {
   test("the compiled server serves its HTML page and bundled assets", async () => {
     const dir = mkdtempSync(join(tmpdir(), "review-html-build-"));
     const executable = join(dir, "review-html");
-    let compiled;
+    let compiled = null;
 
     try {
       const built = await Bun.build({

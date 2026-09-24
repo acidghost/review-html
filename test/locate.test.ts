@@ -1,6 +1,6 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { locate } from "../src/app/anchor.js";
+import { locate } from "../src/app/anchor.ts";
 
 function anchor(text, quote, context = 32) {
   const start = text.indexOf(quote);

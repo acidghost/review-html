@@ -1,4 +1,4 @@
-import { type Comment, tidy } from "./anchor.js";
+import { type Comment, tidy } from "./anchor.ts";
 
 export function markdown(list: Comment[], label: string) {
   const head = `Review of \`${label}\` — ${list.length} comment${list.length === 1 ? "" : "s"}`;

@@ -109,14 +109,14 @@ and its generated assets in both cases.
     just test      # everything, under bun test
     just check     # typecheck, then biome
     just fmt       # biome again, with fixes applied
-    just typecheck # tsc alone
+    just typecheck # strict sources, relaxed tests
 
     just browser   # one-off: download the browser the e2e suite drives
     just e2e       # only the browser suite
 
-`test/e2e.test.js` drives a real Chromium over the served page, selection,
+`test/e2e.test.ts` drives a real Chromium over the served page, selection,
 painting, click-through and re-anchoring paths — the half that pure functions
-cannot reach. `test/cli.test.js` starts and stops real servers. Both skip
+cannot reach. `test/cli.test.ts` starts and stops real servers. Both skip
 themselves, with the reason, where they cannot run: no browser installed, or a
 sandbox that will not let a test have a port. So `just test` stays useful in
 either.

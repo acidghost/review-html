@@ -6,8 +6,7 @@
     "moduleResolution": "bundler",
     "types": ["bun"],
 
-    // Bun runs the sources as they are, so nothing here emits; that is also
-    // what lets the test files import "../src/server.ts" by its real name.
+    // Bun runs the sources directly; TypeScript emits nothing.
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
@@ -15,6 +14,6 @@
     "strict": true,
     "skipLibCheck": true
   },
-  // The tests stay JavaScript and need no types of their own.
+  // Tests are checked separately with relaxed settings.
   "include": ["src"]
 }

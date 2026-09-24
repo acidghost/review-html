@@ -1,6 +1,6 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { shorten } from "../src/app/paths.js";
+import { shorten } from "../src/app/paths.ts";
 import { reviewUrl } from "../src/cli.ts";
 
 test("with no plan there is no query string", () => {

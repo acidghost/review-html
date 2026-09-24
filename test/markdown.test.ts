@@ -1,9 +1,13 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { markdown } from "../src/app/markdown.js";
+import { markdown } from "../src/app/markdown.ts";
 
-function comment(over) {
+function comment(over = {}) {
   return {
+    id: "1",
+    start: 0,
+    prefix: "",
+    suffix: "",
     section: "Design",
     quote: "a quote",
     body: "a note",

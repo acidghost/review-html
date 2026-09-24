@@ -1,8 +1,8 @@
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { keyFor, read, write } from "../src/app/store.js";
+import { keyFor, read, write } from "../src/app/store.ts";
 
-function fakeStorage(entries = {}) {
+function fakeStorage(entries: Record<string, string> = {}) {
   const map = new Map(Object.entries(entries));
   return {
     get length() {
@@ -16,13 +16,13 @@ function fakeStorage(entries = {}) {
   };
 }
 
-function record(over) {
+function record(over = {}) {
   return {
     name: "plan.html",
     path: "~/path/to/repo/.plans/plan.html",
     hash: "abc",
     savedAt: "2026-09-08T10:00:00.000Z",
-    comments: [{ id: "1", quote: "q", body: "b" }],
+    comments: [{ id: "1", start: 0, quote: "q", prefix: "", suffix: "", section: "", body: "b" }],
     ...over,
   };
 }

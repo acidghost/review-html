@@ -1,6 +1,6 @@
 // Range.toString() and the TreeWalker use the same body-text order for offsets.
 
-import type { Heading } from "./anchor.js";
+import type { Heading } from "./anchor.ts";
 
 export function measure(doc: Document, container: Node, offset: number) {
   const r = doc.createRange();

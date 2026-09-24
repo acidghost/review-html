@@ -10,9 +10,9 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PLAN = `${ROOT}test/fixtures/plan.html`;
 const TOKEN = "a-token";
 
-const allow = new Set();
+const allow = new Set<string>();
 const server = serve({ port: 0, token: TOKEN, allow });
-function get(path, init) {
+function get(path: string, init?: RequestInit) {
   return server.fetch(new Request(`http://x${path}`, init));
 }
 function plan(path) {

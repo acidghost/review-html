@@ -1,6 +1,6 @@
 // Key by path, not content hash, so reviews survive plan revisions.
 
-import type { Comment } from "./anchor.js";
+import type { Comment } from "./anchor.ts";
 
 export type KeyValueStorage = {
   readonly length: number;

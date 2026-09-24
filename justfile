@@ -48,9 +48,10 @@ fmt:
 check: typecheck
     biome check src test
 
-# Type-check without fetching a missing dependency from the registry
+# Type-check sources strictly and tests with relaxed settings
 typecheck:
     node_modules/.bin/tsc
+    node_modules/.bin/tsc -p tsconfig.test.json
 
 # Download the browser for e2e tests (requires network access)
 browser:
@@ -58,4 +59,4 @@ browser:
 
 # Only the browser suite
 e2e:
-    bun test test/e2e.test.js
+    bun test test/e2e.test.ts

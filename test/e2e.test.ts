@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, test } from "bun:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { shorten } from "../src/app/paths.js";
+import { shorten } from "../src/app/paths.ts";
 import { serve } from "../src/server.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -74,8 +74,8 @@ async function comment(page, body) {
 }
 
 describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
-  let server;
-  let origin;
+  let server = null;
+  let origin = "";
 
   beforeAll(() => {
     // Port 0 avoids collisions; /_open is covered by the CLI suite.
@@ -149,8 +149,11 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     );
     const ids = await frame.evaluate(
       () =>
-        new Set([...document.querySelectorAll("mark[data-comment]")].map((m) => m.dataset.comment))
-          .size,
+        new Set(
+          [...document.querySelectorAll("mark[data-comment]")].map((m) =>
+            m.getAttribute("data-comment"),
+          ),
+        ).size,
     );
     assert.equal(ids, 1, "the marks share one comment id");
     assert.equal(await page.locator(".card").count(), 1);

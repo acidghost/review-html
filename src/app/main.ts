@@ -1,9 +1,9 @@
-import { CONTEXT, type Comment, type Heading, hash, locate, sectionFor, tidy } from "./anchor.js";
-import { bodyText, measure, paint, readHeadings, unpaint } from "./frame.js";
-import { markdown } from "./markdown.js";
-import { elide, shorten } from "./paths.js";
-import { planCss } from "./plan-css.js";
-import { keyFor, type Review, read as readStore, write as writeStore } from "./store.js";
+import { CONTEXT, type Comment, type Heading, hash, locate, sectionFor, tidy } from "./anchor.ts";
+import { bodyText, measure, paint, readHeadings, unpaint } from "./frame.ts";
+import { markdown } from "./markdown.ts";
+import { elide, shorten } from "./paths.ts";
+import { planCss } from "./plan-css.ts";
+import { keyFor, type Review, read as readStore, write as writeStore } from "./store.ts";
 
 declare global {
   interface Window {
