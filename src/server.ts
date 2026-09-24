@@ -5,6 +5,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { resolve, sep } from "node:path";
 import homepage from "./review.html";
+import { readPlans, writePlans } from "./state.ts";
 
 // Keep the origin stable so saved reviews remain accessible.
 export const PORT = 8422;
@@ -13,6 +14,7 @@ export const PORT = 8422;
 const MARKER = "review-html";
 
 export const TOKEN_HEADER = "x-review-token";
+const ACTION_HEADER = "x-review-action";
 
 function under(path: string, base: string) {
   return path === base || path.startsWith(base + sep);
@@ -44,6 +46,7 @@ export function serve({
   allow = new Set<string>(),
   token = "",
   ceiling = "",
+  stateFile,
   onListening,
   onShutdown,
 }: {
@@ -54,10 +57,16 @@ export function serve({
   token?: string;
   // Optional REVIEW_ROOT ceiling, in addition to the allowlist.
   ceiling?: string;
+  // CLI opts in; direct server tests stay in memory unless given a temp file.
+  stateFile?: string;
   onListening?: () => void;
   onShutdown?: () => void;
 } = {}) {
   const bound = ceiling ? resolve(ceiling) : "";
+  const valid = (path: string) =>
+    path.startsWith("/") && resolve(path) === path && /\.html?$/i.test(path);
+  const saved = stateFile ? [...new Set(readPlans(stateFile).filter(valid))] : [];
+  for (const path of saved) if (!bound || under(path, bound)) allow.add(path);
   let ready = !onListening;
 
   // The token lives in a 0600 file; browsers cannot supply its custom header
@@ -80,13 +89,51 @@ export function serve({
     }
     if (!(await Bun.file(file).exists())) return text(`no such plan`, 404);
 
+    try {
+      if (stateFile && !saved.includes(file)) {
+        writePlans([...saved, file], stateFile);
+        saved.push(file);
+      }
+    } catch {
+      return text("could not save open plans", 500);
+    }
     allow.add(file);
+    return text("ok");
+  };
+
+  const close = async (req: Request) => {
+    // A cross-site form cannot set this header; a custom-header fetch triggers
+    // an unanswered CORS preflight. Origin also has to match this server.
+    if (
+      req.headers.get("origin") !== new URL(req.url).origin ||
+      req.headers.get(ACTION_HEADER) !== "close"
+    )
+      return forbidden();
+    let path: unknown;
+    try {
+      path = (await req.json())?.path;
+    } catch {
+      return text("expected a JSON body", 400);
+    }
+    if (typeof path !== "string" || !allow.has(path)) return missing();
+    try {
+      if (stateFile)
+        writePlans(
+          saved.filter((entry) => entry !== path),
+          stateFile,
+        );
+    } catch {
+      return text("could not save open plans", 500);
+    }
+    const index = saved.indexOf(path);
+    if (index >= 0) saved.splice(index, 1);
+    allow.delete(path);
     return text("ok");
   };
 
   const servePlan = async (path: string) => {
     const file = resolve(path);
-    if (!allow.has(file)) {
+    if (!allow.has(file) || (bound && !under(file, bound))) {
       // Distinguish a disallowed file from a missing one.
       return text("not open for review — re-run review-html on this plan", 403);
     }
@@ -117,6 +164,16 @@ export function serve({
         }
         return Response.json({ pid: process.pid, port, plans: [...allow] });
       },
+      // Browser routes have no underscore; CLI-only token routes do.
+      "/plans": async () =>
+        Response.json(
+          await Promise.all(
+            [...allow]
+              .filter((path) => !bound || under(path, bound))
+              .map(async (path) => ({ path, missing: !(await Bun.file(path).exists()) })),
+          ),
+        ),
+      "/plans/close": { POST: (req) => close(req) },
       "/plan": (req) => {
         const asked = new URL(req.url).searchParams.get("path") ?? "";
         if (!asked.startsWith("/")) return text("plan path must be absolute", 400);

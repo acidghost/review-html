@@ -2,9 +2,12 @@
 
 import { test } from "bun:test";
 import assert from "node:assert/strict";
-import { homedir } from "node:os";
+import { mkdirSync, mkdtempSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve, TOKEN_HEADER } from "../src/server.ts";
+import { readPlans, writePlans } from "../src/state.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PLAN = `${ROOT}test/fixtures/plan.html`;
@@ -154,4 +157,98 @@ test("shutdown requires the token and asks the server to stop itself", async () 
   assert.equal(shutdownRequested, false, "response is returned before shutdown");
   await Bun.sleep(75);
   assert.equal(shutdownRequested, true);
+});
+
+test("saved paths are validated, missing paths stay removable", async () => {
+  server.stop(true);
+  const file = join(mkdtempSync(join(tmpdir(), "review-open-")), "state.json");
+  const gone = `${ROOT}test/fixtures/gone.html`;
+  writePlans([PLAN, PLAN, gone, `${ROOT}package.json`, "relative.html"], file);
+  const instance = serve({ port: 8524, stateFile: file });
+  try {
+    const ask = (path, init?: RequestInit) => request(instance, path, init);
+    assert.deepEqual(await (await ask("/plans")).json(), [
+      { path: PLAN, missing: false },
+      { path: gone, missing: true },
+    ]);
+    assert.equal((await ask(`/plan?path=${encodeURIComponent(gone)}`)).status, 404);
+    assert.equal((await ask(`/plan?path=${encodeURIComponent(PLAN)}`)).status, 200);
+  } finally {
+    instance.stop(true);
+  }
+});
+
+test("a failed state write does not register a plan", async () => {
+  const file = join(mkdtempSync(join(tmpdir(), "review-open-")), "state.json");
+  const instance = serve({ port: 8524, token: TOKEN, stateFile: file });
+  try {
+    mkdirSync(file); // Deliberately make the state path unwritable as a file.
+    const res = await request(instance, "/_open", {
+      method: "POST",
+      headers: { [TOKEN_HEADER]: TOKEN },
+      body: JSON.stringify({ path: PLAN }),
+    });
+    assert.equal(res.status, 500);
+    assert.deepEqual(await (await request(instance, "/plans")).json(), []);
+    assert.equal((await request(instance, `/plan?path=${encodeURIComponent(PLAN)}`)).status, 403);
+  } finally {
+    instance.stop(true);
+  }
+});
+
+test("registered plans persist, list and close through browser routes", async () => {
+  const file = join(mkdtempSync(join(tmpdir(), "review-open-")), "state.json");
+  const other = `${ROOT}src/review.html`;
+  let instance = serve({ port: 8524, token: TOKEN, stateFile: file });
+  const ask = (path, init?: RequestInit) => request(instance, path, init);
+  const register = (path) =>
+    ask("/_open", {
+      method: "POST",
+      headers: { [TOKEN_HEADER]: TOKEN },
+      body: JSON.stringify({ path }),
+    });
+  const close = (path, headers = {}) =>
+    ask("/plans/close", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ path }),
+    });
+  try {
+    assert.deepEqual(await (await ask("/plans")).json(), []);
+    assert.equal((await register(PLAN)).status, 200);
+    assert.equal((await register(other)).status, 200);
+    assert.deepEqual(await (await ask("/plans")).json(), [
+      { path: PLAN, missing: false },
+      { path: other, missing: false },
+    ]);
+    assert.deepEqual(readPlans(file), [PLAN, other]);
+    instance.stop(true);
+    instance = serve({ port: 8524, token: TOKEN, stateFile: file, ceiling: `${ROOT}src` });
+    assert.deepEqual(await (await ask("/plans")).json(), [{ path: other, missing: false }]);
+    assert.deepEqual(readPlans(file), [PLAN, other], "the ceiling does not erase saved paths");
+    assert.equal((await ask(`/plan?path=${encodeURIComponent(PLAN)}`)).status, 403);
+    instance.stop(true);
+    instance = serve({ port: 8524, token: TOKEN, stateFile: file });
+    assert.deepEqual(await (await ask("/plans")).json(), [
+      { path: PLAN, missing: false },
+      { path: other, missing: false },
+    ]);
+    assert.equal((await close(PLAN)).status, 403);
+    assert.equal(
+      (await close(PLAN, { "x-review-action": "close", origin: "http://evil.test" })).status,
+      403,
+    );
+    assert.equal((await close(PLAN, { "x-review-action": "close" })).status, 403);
+    assert.equal(
+      (await close(PLAN, { "x-review-action": "close", origin: instance.url.origin })).status,
+      200,
+    );
+    assert.equal((await ask(`/plan?path=${encodeURIComponent(PLAN)}`)).status, 403);
+    instance.stop(true);
+    instance = serve({ port: 8524, token: TOKEN, stateFile: file });
+    assert.deepEqual(await (await ask("/plans")).json(), [{ path: other, missing: false }]);
+    assert.equal((await ask(`/plan?path=${encodeURIComponent(other)}`)).status, 200);
+  } finally {
+    instance.stop(true);
+  }
 });

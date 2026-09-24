@@ -39,9 +39,10 @@ export function write(storage: KeyValueStorage, key: string, data: Review) {
 }
 
 // Dropped files have no path; fall back by basename, but flag the weak match.
-export function read(storage: KeyValueStorage, key: string, name: string) {
+export function read(storage: KeyValueStorage, key: string, name: string, fallback = true) {
   const data = parse(storage.getItem(key));
   if (data?.comments?.length) return { data, exact: true };
+  if (!fallback) return null;
 
   let best: Review | null = null;
   for (let i = 0; i < storage.length; i += 1) {

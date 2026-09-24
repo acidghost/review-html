@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ping } from "../src/server.ts";
-import { clear, read, write } from "../src/state.ts";
+import { read, write } from "../src/state.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PLAN = `${ROOT}test/fixtures/plan.html`;
@@ -76,7 +76,7 @@ describe.skipIf(unavailable !== null)("the command line", () => {
   afterEach(async () => {
     run("stop");
     await serving(false);
-    clear(STATE);
+    rmSync(STATE, { force: true });
   });
 
   test("serve records itself, readable only by its owner", async () => {
@@ -160,6 +160,32 @@ describe.skipIf(unavailable !== null)("the command line", () => {
     const res = await fetch(url);
     assert.equal(res.status, 200);
     assert.ok((await res.text()).includes("Fixture plan"));
+  });
+
+  test("plans survive stop and restart, unlike the server token", async () => {
+    spawnServer();
+    assert.ok(await serving(true));
+    const first = read(STATE);
+    assert.equal(
+      (
+        await fetch(`http://127.0.0.1:${PORT}/_open`, {
+          method: "POST",
+          headers: { "x-review-token": first.token },
+          body: JSON.stringify({ path: PLAN }),
+        })
+      ).status,
+      200,
+    );
+    run("stop");
+    assert.equal(read(STATE), null);
+    spawnServer();
+    assert.ok(await serving(true));
+    assert.notEqual(read(STATE).token, first.token);
+    assert.match(output(run("status")), new RegExp(PLAN.replace(/\./g, "\\.")));
+    assert.equal(
+      (await fetch(`http://127.0.0.1:${PORT}/plan?path=${encodeURIComponent(PLAN)}`)).status,
+      200,
+    );
   });
 
   test("status names the plans, stop ends it and clears the file", async () => {

@@ -52,6 +52,11 @@ test("a dropped plan finds its review by basename, and says so", () => {
   assert.equal(found.data.path, "~/path/to/repo/.plans/plan.html");
 });
 
+test("a registered plan never borrows another plan's review by basename", () => {
+  const storage = stored([[keyFor("~/work/a/plan.html"), record()]]);
+  assert.equal(read(storage, keyFor("~/work/b/plan.html"), "plan.html", false), null);
+});
+
 test("the newest same-named review wins the fallback", () => {
   const found = read(
     stored([

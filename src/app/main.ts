@@ -34,6 +34,8 @@ let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let storageOk = true;
 let seq = 0;
 let active: string | null = null;
+let currentServerPlan = "";
+let requestId = 0;
 
 // Show orphans first, since they have no place in the document.
 function sortComments() {
@@ -305,7 +307,7 @@ function snapshot(): Review {
 }
 
 function persist() {
-  if (!storageOk || !planName) return;
+  if (!doc || !storageOk || !planName) return;
   try {
     writeStore(localStorage, currentKey(), snapshot());
   } catch {
@@ -321,7 +323,7 @@ function queueSave() {
 
 function readSaved() {
   try {
-    return readStore(localStorage, currentKey(), planName);
+    return readStore(localStorage, currentKey(), planName, !currentServerPlan);
   } catch {
     storageOk = false;
     return null;
@@ -434,7 +436,16 @@ function onSelect() {
 
 let planStyles = ""; // read once at boot to keep loadPlan synchronous
 
-function loadPlan(html: string, name: string, label = "") {
+function loadPlan(html: string, name: string, label = "", serverPath = "") {
+  clearTimeout(saveTimer);
+  persist(); // Save under the old key before changing plan identity.
+  requestId += 1;
+  doc = null;
+  planText = "";
+  planHash = "";
+  headings = [];
+  currentServerPlan = serverPath;
+  if (!serverPath && location.search) history.replaceState(null, "", location.pathname);
   planName = name;
   planPath = label;
   planLabel = label || name;
@@ -442,6 +453,7 @@ function loadPlan(html: string, name: string, label = "") {
   seq = 0;
   active = null;
   hideAdd();
+  render();
 
   iframe.onload = () => {
     let loaded: Document | null = null;
@@ -502,6 +514,125 @@ function fail(title: string, detail: string) {
   empty.hidden = false;
 }
 
+function resetPlan() {
+  clearTimeout(saveTimer);
+  persist();
+  requestId += 1;
+  iframe.onload = null;
+  iframe.srcdoc = "";
+  doc = null;
+  comments = [];
+  headings = [];
+  planName = "";
+  planPath = "";
+  planLabel = "";
+  planText = "";
+  planHash = "";
+  currentServerPlan = "";
+  hideAdd();
+  $("name").textContent = "Plan reviewer";
+  $("name").removeAttribute("title");
+  document.title = "Plan reviewer";
+  $("empty").textContent = "Drop a plan HTML file here, or open it by path";
+  $("empty").hidden = false;
+  note("");
+  render();
+}
+
+async function loadFromPath(path: string, push = false) {
+  if (path === currentServerPlan) {
+    requestId += 1; // Cancel any older switch still fetching.
+    return;
+  }
+  const id = ++requestId;
+  try {
+    const res = await fetch(`/plan?path=${encodeURIComponent(path)}`);
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const html = await res.text();
+    if (id !== requestId) return;
+    loadPlan(html, path.split("/").pop() ?? path, shorten(path), path);
+    if (push) {
+      const url = new URL(location.href);
+      url.searchParams.set("plan", path);
+      history.pushState(null, "", url);
+    }
+  } catch (err) {
+    if (id !== requestId) return;
+    const message = `Could not load ${shorten(path)}: ${(err as Error).message}`;
+    if (doc) note(message);
+    else fail(message, "Check that this plan is still open for review.");
+  }
+}
+
+type OpenPlan = { path: string; missing: boolean };
+
+function pickerError(message: string) {
+  const error = $("plansError");
+  error.textContent = message;
+  error.hidden = !message;
+}
+
+async function refreshPlans() {
+  try {
+    const res = await fetch("/plans");
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const plans = (await res.json()) as OpenPlan[];
+    $<HTMLButtonElement>("plansBtn").textContent = `Plans (${plans.length})`;
+    const list = $("plansList");
+    list.textContent = "";
+    if (!plans.length) list.textContent = "No plans open. Use review-html <plan> to add one.";
+    for (const plan of plans) {
+      const row = document.createElement("div");
+      row.className = "plan-row";
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "plan-label";
+      open.textContent = `${shorten(plan.path)}${plan.path === currentServerPlan ? " (current)" : ""}`;
+      open.title = plan.path;
+      open.disabled = plan.missing;
+      open.addEventListener("click", async () => {
+        $<HTMLDialogElement>("plansDialog").close();
+        await loadFromPath(plan.path, true);
+      });
+      row.append(open);
+      if (plan.missing) {
+        const missing = document.createElement("span");
+        missing.className = "missing";
+        missing.textContent = "Missing";
+        row.append(missing);
+      }
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "remove";
+      remove.textContent = "Remove";
+      remove.setAttribute("aria-label", `Remove ${plan.path} from open plans`);
+      remove.addEventListener("click", async () => {
+        try {
+          const result = await fetch("/plans/close", {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-review-action": "close" },
+            body: JSON.stringify({ path: plan.path }),
+          });
+          if (!result.ok) throw new Error(`${result.status} ${result.statusText}`);
+          requestId += 1; // A pending fetch must not re-open a removed plan.
+          if (currentServerPlan === plan.path) {
+            resetPlan();
+            history.replaceState(null, "", location.pathname);
+          }
+          await refreshPlans();
+        } catch (err) {
+          pickerError(`Could not remove plan: ${(err as Error).message}`);
+        }
+      });
+      row.append(remove);
+      list.append(row);
+    }
+    pickerError("");
+  } catch (err) {
+    pickerError(`Could not list plans: ${(err as Error).message}`);
+  }
+}
+
 function openFile(file: File | undefined) {
   if (!file) return;
   const isReview = /\.json$/i.test(file.name);
@@ -517,6 +648,11 @@ function openFile(file: File | undefined) {
 // Keep the selection while clicking Add.
 $("add").addEventListener("mousedown", (e) => e.preventDefault());
 $("add").addEventListener("click", addComment);
+$("plansBtn").addEventListener("click", () => {
+  $<HTMLDialogElement>("plansDialog").showModal();
+  void refreshPlans();
+});
+$("plansClose").addEventListener("click", () => $<HTMLDialogElement>("plansDialog").close());
 $("openBtn").addEventListener("click", () => $("file").click());
 $("file").addEventListener("change", (e) => openFile((e.target as HTMLInputElement).files?.[0]));
 $("orphanBtn").addEventListener("click", clearOrphans);
@@ -568,16 +704,13 @@ async function boot() {
   // Only now, so `window.reviewer` appearing means a plan can be loaded.
   window.reviewer = reviewer;
 
+  void refreshPlans();
   const plan = new URLSearchParams(location.search).get("plan");
-  if (!plan) return;
-
-  const label = shorten(plan);
-  try {
-    const res = await fetch(`/plan?path=${encodeURIComponent(plan)}`);
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    loadPlan(await res.text(), plan.split("/").pop() ?? plan, label);
-  } catch (err) {
-    fail(`Could not load ${label}`, `${(err as Error).message} — is \`just serve\` running?`);
-  }
+  if (plan) await loadFromPath(plan);
 }
+window.addEventListener("popstate", () => {
+  const plan = new URLSearchParams(location.search).get("plan");
+  if (plan) void loadFromPath(plan);
+  else resetPlan();
+});
 boot();

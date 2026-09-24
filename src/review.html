@@ -12,6 +12,7 @@
       <span id="count" class="muted"></span>
       <span id="note" class="muted"></span>
       <span class="spacer"></span>
+      <button type="button" id="plansBtn">Plans</button>
       <button type="button" id="openBtn">Open…</button>
       <button type="button" id="orphanBtn" disabled>Clear unanchored</button>
       <button type="button" id="clearBtn" disabled>Clear all</button>
@@ -34,6 +35,16 @@
         <div id="cards"></div>
       </aside>
     </main>
+
+    <dialog id="plansDialog" aria-labelledby="plansTitle">
+      <div class="row">
+        <strong id="plansTitle">Open plans</strong>
+        <span class="spacer"></span>
+        <button type="button" id="plansClose">Close</button>
+      </div>
+      <p id="plansError" role="alert" hidden></p>
+      <div id="plansList"></div>
+    </dialog>
 
     <button type="button" id="add" hidden>Add comment</button>
 

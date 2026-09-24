@@ -9,6 +9,7 @@ import { serve } from "../src/server.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PLAN = `${ROOT}test/fixtures/plan.html`;
+const OTHER = `${ROOT}test/fixtures/other.html`;
 const LABEL = shorten(PLAN);
 
 // Decide whether to skip before declaring the suite; launch tests the binary.
@@ -76,10 +77,11 @@ async function comment(page, body) {
 describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
   let server = null;
   let origin = "";
+  const opened = new Set([PLAN]);
 
   beforeAll(() => {
     // Port 0 avoids collisions; /_open is covered by the CLI suite.
-    server = serve({ port: 0, allow: new Set([PLAN]) });
+    server = serve({ port: 0, allow: opened });
     origin = server.url.origin;
   });
 
@@ -106,6 +108,71 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
       await frame.evaluate(() => [...document.querySelectorAll("h2")].map((h) => h.textContent)),
       ["Goal", "Context", "Steps", "Verification"],
     );
+  });
+
+  test("picker switches plans, keeps reviews, and removes without deleting them", async () => {
+    const page = await open();
+    try {
+      const frame = await planFrame(page);
+      await select(frame, "This sentence exists", "a selection can start");
+      await comment(page, "first plan note");
+      opened.add(OTHER); // as if a second CLI registration happened after page load
+      await page.click("#plansBtn");
+      await page.locator(`.plan-label[title="${OTHER}"]`).click();
+      await page.waitForFunction(
+        (path) => new URL(location.href).searchParams.get("plan") === path,
+        OTHER,
+      );
+      assert.equal(await page.frameLocator("#plan").locator("h1").textContent(), "Other plan");
+      assert.equal(await page.locator(".card").count(), 0);
+      await page.reload();
+      await planFrame(page);
+      await page.goBack();
+      await page.waitForFunction(
+        (path) => document.querySelector("#name").getAttribute("title") === path,
+        LABEL,
+      );
+      assert.equal(await page.locator(".card textarea").inputValue(), "first plan note");
+
+      await page.click("#plansBtn");
+      const removed = page.waitForResponse((res) => new URL(res.url()).pathname === "/plans/close");
+      await page.getByRole("button", { name: `Remove ${PLAN} from open plans` }).click();
+      assert.equal((await removed).status(), 200);
+      await page.locator("#empty").waitFor({ state: "visible" });
+      assert.equal(new URL(page.url()).searchParams.has("plan"), false);
+      assert.equal((await fetch(`${origin}/plan?path=${encodeURIComponent(PLAN)}`)).status, 403);
+      assert.equal((await readFile(PLAN, "utf8")).includes("Fixture plan"), true);
+      assert.equal(await page.locator("#plansList .plan-row").count(), 1);
+      opened.add(PLAN); // Reopen later; removing must not erase the review.
+      await page.click("#plansClose");
+      await page.click("#plansBtn");
+      await page.locator(`.plan-label[title="${PLAN}"]`).click();
+      assert.equal(await page.locator(".card textarea").inputValue(), "first plan note");
+    } finally {
+      opened.delete(OTHER);
+      opened.add(PLAN);
+      await page.close();
+    }
+  });
+
+  test("missing plans remain in the picker and can be removed", async () => {
+    const gone = `${ROOT}test/fixtures/gone.html`;
+    opened.add(gone);
+    const page = await open();
+    try {
+      await page.click("#plansBtn");
+      const entry = page.locator(`.plan-label[title="${gone}"]`);
+      await entry.waitFor();
+      assert.equal(await entry.isDisabled(), true);
+      assert.equal(await page.getByText("Missing", { exact: true }).count(), 1);
+      const removed = page.waitForResponse((res) => new URL(res.url()).pathname === "/plans/close");
+      await page.getByRole("button", { name: `Remove ${gone} from open plans` }).click();
+      assert.equal((await removed).status(), 200);
+      await page.locator(`.plan-label[title="${gone}"]`).waitFor({ state: "detached" });
+    } finally {
+      opened.delete(gone);
+      await page.close();
+    }
   });
 
   test("a selection inside one paragraph becomes one mark and one comment", async () => {

@@ -146,6 +146,7 @@ function serveHere(port: number, ceiling: string) {
     port,
     token: recorded.token,
     ceiling,
+    stateFile: state.FILE,
     onListening: () => state.write(recorded),
     onShutdown: () => process.kill(process.pid, "SIGTERM"),
   });

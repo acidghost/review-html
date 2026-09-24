@@ -203,6 +203,49 @@ aside {
   font-size: 0.85rem;
 }
 
+#plansDialog {
+  width: min(42rem, 95vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 1rem;
+}
+#plansDialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+#plansDialog .row,
+.plan-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+#plansList {
+  margin-top: 0.8rem;
+}
+.plan-row {
+  border-top: 1px solid var(--rule);
+  padding: 0.6rem 0;
+}
+.plan-row .plan-label {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.plan-row .remove:hover {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+.plan-row .missing {
+  color: var(--warn);
+}
+#plansError {
+  color: var(--warn);
+}
+
 #add {
   position: fixed;
   z-index: 5;

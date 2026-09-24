@@ -24,7 +24,9 @@ plus `just` and `biome`. Everything else is a `bun install` away.
 One compiled binary on `$PATH`, run from any directory. It starts a loopback
 server if none is listening, hands it that plan, and opens the reviewer on it.
 Select text, _Add comment_, type; comments save themselves. _Copy Markdown_ puts
-the export on the clipboard, _Save .md_ writes `<plan>.review.md`.
+the export on the clipboard, _Save .md_ writes `<plan>.review.md`. _Plans_ lists
+registered plans: switch to one, or remove it from the list without deleting its
+HTML file or comments. The list survives server restarts.
 
     review-html          the reviewer with no plan, ready for a dropped file
     review-html serve    run the server in the foreground
@@ -62,9 +64,14 @@ cannot read the response — the same-origin policy does that work. The allowlis
 is what stops a _local_ reader: any other process on the machine can curl
 loopback and read whatever it is given, and CORS has nothing to say about that.
 
-The allowlist is in memory, so restarting the server empties it and a stale
-tab's reload gets a 403 saying so. Set `REVIEW_ROOT` for a hard ceiling on what
-may be registered at all; unset, the allowlist is the whole boundary.
+Registered plans persist in `~/.cache/review-html/state.json` across restarts;
+only the server PID and token are cleared on stop. `/plans` lists registered
+paths to the reviewer and `/plans/close` forgets a path (never its file or saved
+review). These browser routes are separate from the token-protected `/_…` CLI
+control routes. Dropped files have no known absolute path and are not registered.
+Set `REVIEW_ROOT` for a hard ceiling on what may be registered or restored;
+paths outside the ceiling stay saved but are not listed or served until the
+ceiling permits them again. With no ceiling, the allowlist is the whole boundary.
 
 ## How comments stay attached
 
@@ -90,7 +97,7 @@ and paint highlights.
 | `src/app/*.css`     | reviewer chrome, and what is injected into plans   |
 | `src/server.ts`     | Bun HTML route, API routes, and the plan allowlist |
 | `src/cli.ts`        | the commands, and the URL to open                  |
-| `src/state.ts`      | pid, port and token, at `0600`                     |
+| `src/state.ts`      | pid, port, token and registered plans, at `0600`   |
 
 `frame.ts` takes the plan's `document` as an argument and `store.ts` takes the
 storage object, so neither reaches for a global — which is what makes them
