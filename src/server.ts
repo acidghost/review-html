@@ -145,7 +145,7 @@ export function serve({
     hostname: "127.0.0.1",
     port,
     routes: {
-      "/review.html": homepage,
+      "/": homepage,
       "/_ping": () => (ready ? text(MARKER) : text("starting", 503)),
       "/_shutdown": {
         POST: (req) => {

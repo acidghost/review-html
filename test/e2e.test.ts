@@ -93,7 +93,7 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     page.on("dialog", (d) => d.accept()); // the delete button confirms
-    await page.goto(`${origin}/review.html${query}`);
+    await page.goto(`${origin}/${query}`);
     return page;
   };
 

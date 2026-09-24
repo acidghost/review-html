@@ -4,7 +4,7 @@ import { shorten } from "../src/app/paths.ts";
 import { reviewUrl } from "../src/cli.ts";
 
 test("with no plan there is no query string", () => {
-  assert.equal(reviewUrl({ port: 8422 }), "http://127.0.0.1:8422/review.html");
+  assert.equal(reviewUrl({ port: 8422 }), "http://127.0.0.1:8422/");
 });
 
 // Preserve arbitrary filenames across the query-string boundary.

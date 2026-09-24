@@ -53,7 +53,7 @@ test("unmatched static paths are not served from the source tree", async () => {
 });
 
 test("serves the favicon linked from the reviewer", async () => {
-  const page = await (await get("/review.html")).text();
+  const page = await (await get("/")).text();
   const favicon = page.match(/<link rel="icon"[^>]*href="([^"]+)"/)?.[1];
   assert.ok(favicon, "the page links a favicon");
 
@@ -67,9 +67,8 @@ test("answers the health check the CLI uses", async () => {
   assert.equal((await get("/_ping")).status, 200);
 });
 
-test("a missing file, and the root directory, are both 404", async () => {
+test("a missing file is 404", async () => {
   assert.equal((await get("/nope.html")).status, 404);
-  assert.equal((await get("/")).status, 404);
 });
 
 // Local processes can read loopback responses: the allowlist is the boundary.

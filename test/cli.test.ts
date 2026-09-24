@@ -250,7 +250,7 @@ describe.skipIf(unavailable !== null)("the command line", () => {
       });
       assert.ok(await serving(true), "compiled server never came up");
 
-      const response = await fetch(`http://127.0.0.1:${PORT}/review.html`);
+      const response = await fetch(`http://127.0.0.1:${PORT}/`);
       assert.equal(response.status, 200);
       const html = await response.text();
       assert.match(html, /Plan reviewer/);

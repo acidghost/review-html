@@ -20,7 +20,7 @@ review-html status   what is running, and which plans it will serve
 Subcommands win the bare word: a plan named "serve" is reachable as ./serve.`;
 
 export function reviewUrl({ plan = "", port = PORT } = {}) {
-  const url = new URL(`http://127.0.0.1:${port}/review.html`);
+  const url = new URL(`http://127.0.0.1:${port}/`);
   if (plan) url.searchParams.set("plan", plan);
   return url.href;
 }
