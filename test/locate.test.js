@@ -2,7 +2,7 @@ import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { locate } from "../src/app/anchor.js";
 
-const anchor = (text, quote, context = 32) => {
+function anchor(text, quote, context = 32) {
   const start = text.indexOf(quote);
   assert.ok(start >= 0, `fixture does not contain ${quote}`);
   return {
@@ -11,7 +11,7 @@ const anchor = (text, quote, context = 32) => {
     prefix: text.slice(Math.max(0, start - context), start),
     suffix: text.slice(start + quote.length, start + quote.length + context),
   };
-};
+}
 
 const PLAN =
   "Intro paragraph. The parser must handle nesting. Then we ship it.";

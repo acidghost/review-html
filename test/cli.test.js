@@ -1,9 +1,4 @@
-/* The lifecycle: start detached, register a plan, stop, and recover from a
-   server that was killed. These are the paths no in-process test reaches,
-   since the whole point of them is a second process and a real socket.
-
-   Needs a port it can both bind and connect to. A sandbox may allow neither,
-   so the suite skips with the reason rather than failing. */
+// Lifecycle tests need loopback; skip when the sandbox blocks it.
 
 import { afterEach, beforeAll, describe, test } from "bun:test";
 import assert from "node:assert/strict";
@@ -20,8 +15,7 @@ const CLI = `${ROOT}src/cli.ts`;
 const PORT = 8523;
 const STATE = join(mkdtempSync(join(tmpdir(), "review-html-")), "state.json");
 
-/* Both halves have to be settled before the describe is declared, because
-   that is when bun:test decides to skip it. */
+// Determine skip status before declaring the suite.
 let unavailable = null;
 try {
   const decoy = Bun.serve({
@@ -39,8 +33,8 @@ try {
   console.log(`skipping the lifecycle suite: ${unavailable}`);
 }
 
-const runAt = (port, ...args) =>
-  Bun.spawnSync(
+function runAt(port, ...args) {
+  return Bun.spawnSync(
     [process.execPath, "run", CLI, "--port", String(port), ...args],
     {
       env: { ...process.env, REVIEW_STATE: STATE },
@@ -48,23 +42,27 @@ const runAt = (port, ...args) =>
       stderr: "pipe",
     },
   );
+}
 
-const run = (...args) => runAt(PORT, ...args);
+function run(...args) {
+  return runAt(PORT, ...args);
+}
 
-const output = (result) =>
-  `${result.stdout.toString()}${result.stderr.toString()}`.trim();
+function output(result) {
+  return `${result.stdout.toString()}${result.stderr.toString()}`.trim();
+}
 
 // Started detached, so it has to be waited for rather than awaited.
-const serving = async (want) => {
+async function serving(want) {
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
     if (((await ping(PORT)) === "ours") === want) return true;
     await Bun.sleep(50);
   }
   return false;
-};
+}
 
-const spawnServer = () => {
+function spawnServer() {
   const child = Bun.spawn(
     [process.execPath, "run", CLI, "--port", String(PORT), "serve"],
     {
@@ -74,7 +72,7 @@ const spawnServer = () => {
   );
   child.unref();
   return child;
-};
+}
 
 describe.skipIf(unavailable !== null)("the command line", () => {
   beforeAll(async () => {
@@ -158,9 +156,7 @@ describe.skipIf(unavailable !== null)("the command line", () => {
     assert.deepEqual(read(STATE), before);
   });
 
-  /* The socket binds before state is written, but /_ping stays in its
-     starting state until the token is on disk. That is what keeps `review-html
-     <plan>` from racing its child. */
+  // /_ping must not report ready before the token is written.
   test("a plan is registered and then readable, and only then", async () => {
     spawnServer();
     assert.ok(await serving(true));
@@ -196,8 +192,7 @@ describe.skipIf(unavailable !== null)("the command line", () => {
     assert.equal(read(STATE), null, "the file goes with the server");
   });
 
-  /* SIGKILL leaves the file behind, which is why nothing trusts it without
-     asking the port first. */
+  // SIGKILL leaves stale state; verify it against the socket.
   test("a state file left by a killed server does not wedge anything", async () => {
     const child = spawnServer();
     assert.ok(await serving(true));

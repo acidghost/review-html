@@ -5,8 +5,7 @@ cli := "bun run " + justfile_directory() + "/src/cli.ts --port " + port
 open:
     just review
 
-# Review a plan: just review ~/path/to/repo/.plans/2026-09-08-thing.html
-# The cd is what lets a relative plan mean what you typed.
+# Review a plan, resolving relative paths from the caller's directory
 review plan="":
     cd {{ quote(invocation_directory()) }} && {{ cli }} {{ quote(plan) }}
 
@@ -41,19 +40,19 @@ install: build
 test:
     bun test
 
+# Format and lint sources and tests
 fmt:
     biome check --write src test
 
+# Type-check and lint sources and tests
 check: typecheck
     biome check src test
 
-# node_modules/.bin rather than bunx, which would reach for the registry if the
-# devDependency were missing instead of saying so
+# Type-check without fetching a missing dependency from the registry
 typecheck:
     node_modules/.bin/tsc
 
-# Download the browser the e2e tests need (network: cdn.playwright.dev).
-# The package ships no postinstall, so this stays an explicit one-off.
+# Download the browser for e2e tests (requires network access)
 browser:
     node_modules/.bin/playwright install chromium
 

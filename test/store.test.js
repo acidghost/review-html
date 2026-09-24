@@ -2,8 +2,7 @@ import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { keyFor, read, write } from "../src/app/store.js";
 
-// Enough of the Storage interface for store.ts: it only indexes and gets/sets.
-const fakeStorage = (entries = {}) => {
+function fakeStorage(entries = {}) {
   const map = new Map(Object.entries(entries));
   return {
     get length() {
@@ -15,21 +14,24 @@ const fakeStorage = (entries = {}) => {
     removeItem: (k) => map.delete(k),
     has: (k) => map.has(k),
   };
-};
+}
 
-const record = (over) => ({
-  name: "plan.html",
-  path: "~/path/to/repo/.plans/plan.html",
-  hash: "abc",
-  savedAt: "2026-09-08T10:00:00.000Z",
-  comments: [{ id: "1", quote: "q", body: "b" }],
-  ...over,
-});
+function record(over) {
+  return {
+    name: "plan.html",
+    path: "~/path/to/repo/.plans/plan.html",
+    hash: "abc",
+    savedAt: "2026-09-08T10:00:00.000Z",
+    comments: [{ id: "1", quote: "q", body: "b" }],
+    ...over,
+  };
+}
 
-const stored = (records) =>
-  fakeStorage(
+function stored(records) {
+  return fakeStorage(
     Object.fromEntries(records.map(([k, v]) => [k, JSON.stringify(v)])),
   );
+}
 
 test("a record under the exact key is an exact match", () => {
   const key = keyFor("~/path/to/repo/.plans/plan.html");
@@ -43,7 +45,6 @@ test("nothing stored means nothing to restore", () => {
 });
 
 test("a dropped plan finds its review by basename, and says so", () => {
-  // Saved from a served session (keyed by path), reopened by drop (keyed by name).
   const found = read(
     stored([[keyFor("~/path/to/repo/.plans/plan.html"), record()]]),
     keyFor("plan.html"),
@@ -85,8 +86,7 @@ test("reviews of other plans are not offered", () => {
 });
 
 test("unrelated storage keys are ignored", () => {
-  // The plan template keeps its width slider in localStorage under this key,
-  // and shares an origin with the reviewer.
+  // The plan template shares this origin and stores its width here.
   const storage = fakeStorage({
     "plan-width": "48rem",
     junk: "not json at all",

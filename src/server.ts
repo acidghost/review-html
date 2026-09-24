@@ -1,44 +1,45 @@
 #!/usr/bin/env bun
-/* Serves the Bun-bundled reviewer on loopback, and the plans it has been
-   handed. Plans are read through /plan?path=<absolute>, and only the ones
-   something authenticated has registered.
-
-   That allowlist is the boundary. A malicious web page can send a request
-   here but cannot read the response, because no Access-Control-Allow-Origin
-   comes back; the same-origin policy does that work. What the allowlist stops
-   is a local reader — any other process on the machine can curl loopback and
-   read whatever it is given, and CORS has nothing to say about that. */
+// The allowlist protects against local readers; CORS only protects browsers.
+// Only authenticated requests can add plans to it.
 
 import { timingSafeEqual } from "node:crypto";
 import { resolve, sep } from "node:path";
 import homepage from "./review.html";
 
-/* Fixed, and not a preference: localStorage is partitioned by origin and the
-   port is part of the origin, so a port per invocation would orphan every
-   saved review. */
+// Keep the origin stable so saved reviews remain accessible.
 export const PORT = 8422;
 
-/* Answered at /_ping, and asking for the body rather than just a 200 is what
-   tells our server apart from anything else on the port. */
+// The CLI checks this body to distinguish our server from another on the port.
 const MARKER = "review-html";
 
 export const TOKEN_HEADER = "x-review-token";
 
-const under = (path: string, base: string) =>
-  path === base || path.startsWith(base + sep);
+function under(path: string, base: string) {
+  return path === base || path.startsWith(base + sep);
+}
 
-const text = (body: string, status = 200) => new Response(body, { status });
-const forbidden = () => text("forbidden", 403);
-const missing = () => text("not found", 404);
+function text(body: string, status = 200) {
+  return new Response(body, { status });
+}
 
-/* Length first: timingSafeEqual throws on a mismatch, and a throw here would
-   be an oracle of its own. */
-const sameToken = (given: string | null, token: string) =>
-  token.length > 0 &&
-  given?.length === token.length &&
-  timingSafeEqual(Buffer.from(given), Buffer.from(token));
+function forbidden() {
+  return text("forbidden", 403);
+}
 
-export const serve = ({
+function missing() {
+  return text("not found", 404);
+}
+
+// timingSafeEqual throws on unequal lengths.
+function sameToken(given: string | null, token: string) {
+  return (
+    token.length > 0 &&
+    given?.length === token.length &&
+    timingSafeEqual(Buffer.from(given), Buffer.from(token))
+  );
+}
+
+export function serve({
   port = PORT,
   allow = new Set<string>(),
   token = "",
@@ -47,28 +48,20 @@ export const serve = ({
   onShutdown,
 }: {
   port?: number;
-  /* The plans that may be read. The caller owns it, so a test can populate it
-     without going through /_open. */
+  // The caller owns the allowlist; tests can populate it directly.
   allow?: Set<string>;
-  /* Authenticates /_open, /_status and /_shutdown. Empty refuses them, which
-     is what a server nobody handed a token should do. */
+  // Empty tokens refuse authenticated operations.
   token?: string;
-  /* Optional outer bound on what may be registered — REVIEW_ROOT, for someone
-     who wants a hard ceiling as well as the allowlist. */
+  // Optional REVIEW_ROOT ceiling, in addition to the allowlist.
   ceiling?: string;
-  /* Called after the socket binds, before /_ping reports this server as ready. */
   onListening?: () => void;
-  /* Authenticated shutdown hook; the server owner decides how to exit. */
   onShutdown?: () => void;
-} = {}) => {
+} = {}) {
   const bound = ceiling ? resolve(ceiling) : "";
   let ready = !onListening;
 
-  /* Registering a file and stopping the server are authenticated operations.
-     A page that could add a path and then read it back would have arbitrary
-     file read; shutdown is limited to the local CLI too. The token comes from
-     a 0600 file, which a browser cannot read, and the custom header puts these
-     requests behind a preflight that goes unanswered. */
+  // The token lives in a 0600 file; browsers cannot supply its custom header
+  // without a CORS preflight, which this server does not answer.
   const open = async (req: Request) => {
     if (!sameToken(req.headers.get(TOKEN_HEADER), token)) return forbidden();
 
@@ -80,7 +73,7 @@ export const serve = ({
     }
     if (!path.startsWith("/")) return text("plan path must be absolute", 400);
 
-    const file = resolve(path); // folds away any `..` before the checks
+    const file = resolve(path);
     if (!/\.html?$/i.test(file)) return text(`not a plan: ${file}`, 403);
     if (bound && !under(file, bound)) {
       return text(`${file} is outside ${bound}`, 403);
@@ -94,7 +87,7 @@ export const serve = ({
   const servePlan = async (path: string) => {
     const file = resolve(path);
     if (!allow.has(file)) {
-      // Distinguishable from a 404 on purpose: the file may well be there.
+      // Distinguish a disallowed file from a missing one.
       return text("not open for review — re-run review-html on this plan", 403);
     }
     const found = Bun.file(file);
@@ -109,8 +102,6 @@ export const serve = ({
       const url = new URL(req.url);
       const path = decodeURIComponent(url.pathname);
 
-      // The health check the CLI uses. It cannot be `/`, which in served mode
-      // is a directory and so has nothing to answer with.
       if (path === "/_ping") {
         return ready ? text(MARKER) : text("starting", 503);
       }
@@ -151,9 +142,9 @@ export const serve = ({
     throw err;
   }
   return server;
-};
+}
 
-export const ping = async (port: number) => {
+export async function ping(port: number) {
   try {
     const res = await fetch(`http://127.0.0.1:${port}/_ping`, {
       signal: AbortSignal.timeout(500),
@@ -162,4 +153,4 @@ export const ping = async (port: number) => {
   } catch {
     return "down";
   }
-};
+}

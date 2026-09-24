@@ -1,11 +1,4 @@
-/* The DOM half: selection, painting, click-through, re-anchoring. These are
-   exactly the paths the pure-function tests cannot reach.
-
-   Needs a browser binary: `just browser`. Without one the suite skips rather
-   than fails, so `just test` stays useful on a machine that has none.
-
-   Drives the real server.ts, so a break in how plans are served shows up here
-   rather than only in `just review`. */
+// Requires `just browser`; skips if no browser binary is installed.
 
 import { afterAll, beforeAll, describe, test } from "bun:test";
 import assert from "node:assert/strict";
@@ -16,14 +9,9 @@ import { serve } from "../src/server.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PLAN = `${ROOT}test/fixtures/plan.html`;
-// What the reviewer derives for itself, now that no label is passed to it.
 const LABEL = shorten(PLAN);
 
-/* Both halves of "is there a browser" have to be settled before the describe
-   is declared, because that is when bun:test decides to skip it — and only
-   launching proves the second half. Hence an import and a launch out here.
-
-   Dynamic, so a missing package skips the suite like a missing binary does. */
+// Decide whether to skip before declaring the suite; launch tests the binary.
 let browser = null;
 let unavailable = null;
 try {
@@ -31,30 +19,23 @@ try {
   browser = await chromium.launch();
 } catch (err) {
   unavailable = err.message.split("\n")[0];
-  // The reason is the point of skipping rather than failing; bun:test does
-  // not carry one, so say it here.
+  // bun:test does not report skip reasons.
   console.log(`skipping the browser suite: ${unavailable}`);
 }
 
-// Both suites share the one browser, so closing it belongs to neither.
 afterAll(async () => {
   await browser?.close();
 });
 
-/* ---------- driving the two documents ---------- */
-
-// The plan lives in a srcdoc iframe, so most assertions run in the child frame.
-const planFrame = async (page) => {
+async function planFrame(page) {
   await page.waitForFunction(() => document.getElementById("empty").hidden);
   await page.waitForFunction(() => window.frames.length > 0);
   return page.frames().find((f) => f !== page.mainFrame());
-};
+}
 
-/* Select `needle` within the element whose text starts with `from`. Given a
-   second element and needle, the range runs to the end of that one, crossing
-   the boundary. Returns the selected text: the comment's quote. */
-const select = (frame, from, needle, to = null, endNeedle = null) =>
-  frame.evaluate(
+// Select text across one or two elements; return the selected quote.
+function select(frame, from, needle, to = null, endNeedle = null) {
+  return frame.evaluate(
     ({ from, needle, to, endNeedle }) => {
       const element = (text) =>
         [...document.body.querySelectorAll("p, li, td, h2, h3")].find((el) =>
@@ -82,8 +63,9 @@ const select = (frame, from, needle, to = null, endNeedle = null) =>
     },
     { from, needle, to, endNeedle },
   );
+}
 
-const comment = async (page, body) => {
+async function comment(page, body) {
   await page.waitForSelector("#add:not([hidden])");
   await page.click("#add");
   // addComment() focuses the new card, and cards sort into document order, so
@@ -91,15 +73,14 @@ const comment = async (page, body) => {
   await page.waitForSelector(".card textarea:focus");
   await page.keyboard.insertText(body);
   await page.waitForTimeout(500); // outlast the 400ms save debounce
-};
+}
 
 describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
   let server;
   let origin;
 
   beforeAll(() => {
-    // Port 0: a fixed one would collide with a server left running.
-    // The fixture is handed over directly, since /_open is the CLI's job.
+    // Port 0 avoids collisions; /_open is covered by the CLI suite.
     server = serve({ port: 0, allow: new Set([PLAN]) });
     origin = server.url.origin;
   });
@@ -147,8 +128,7 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
       await frame.locator("mark[data-comment]").textContent(),
       quote,
     );
-    // plan.css is injected as a <style> into a sandboxed srcdoc frame; this
-    // is the assertion that it actually arrived.
+    // Verify injected CSS reaches the sandboxed frame.
     assert.equal(
       await frame
         .locator("mark[data-comment]")
@@ -228,8 +208,7 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
       "<h2>Goal</h2>",
       "<h2>Goal</h2>\n<p>A paragraph inserted above the anchor, shifting every offset below it.</p>",
     );
-    // Matched on the pathname: the plan is in the query string now, where a
-    // glob would have to account for its encoding.
+    // Match the pathname, not the encoded plan query.
     await page.route(
       (url) => url.pathname === "/plan",
       (route) => route.fulfill({ contentType: "text/html", body: revised }),
@@ -311,7 +290,6 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     assert.equal(await page.locator(".card").count(), 0);
     assert.equal(await frame.locator("mark[data-comment]").count(), 0);
     assert.ok(await page.isDisabled("#clearBtn"));
-    // The emptied review must not come back on the next load.
     await page.waitForTimeout(500); // outlast the 400ms save debounce
     await page.reload();
     await planFrame(page);
@@ -327,7 +305,6 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     await select(frame, "A second paragraph", "the far end");
     await comment(page, "about the surviving one");
 
-    // Drop the first anchor's paragraph: its comment has nowhere left to go.
     const revised = (await readFile(PLAN, "utf8")).replace(
       /<p>\s*This sentence exists[\s\S]*?<\/p>/,
       "",
@@ -361,8 +338,7 @@ describe.skipIf(unavailable !== null)("reviewer in a browser", () => {
     await comment(page, "keep me");
 
     const box = page.locator(".card textarea");
-    // Commit it first: Esc reverts to the value at focus time, and without this
-    // that value is "", which is the discard-a-new-draft case instead.
+    // Esc restores the value at focus, so first commit the new comment.
     await box.blur();
     await box.focus();
     await box.pressSequentially(" and this too");

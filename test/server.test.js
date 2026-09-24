@@ -1,5 +1,4 @@
-/* server.fetch() dispatches without a socket, which is what makes these
-   runnable where loopback is closed off — a sandbox, mainly. */
+// In-process fetch works even when loopback is unavailable.
 
 import { test } from "bun:test";
 import assert from "node:assert/strict";
@@ -13,11 +12,22 @@ const TOKEN = "a-token";
 
 const allow = new Set();
 const server = serve({ port: 0, token: TOKEN, allow });
-const get = (path, init) => server.fetch(new Request(`http://x${path}`, init));
-const plan = (path) => get(`/plan?path=${encodeURIComponent(path)}`);
-const post = (path, headers) =>
-  get("/_open", { method: "POST", body: JSON.stringify({ path }), headers });
-const open = (path) => post(path, { [TOKEN_HEADER]: TOKEN });
+function get(path, init) {
+  return server.fetch(new Request(`http://x${path}`, init));
+}
+function plan(path) {
+  return get(`/plan?path=${encodeURIComponent(path)}`);
+}
+function post(path, headers) {
+  return get("/_open", {
+    method: "POST",
+    body: JSON.stringify({ path }),
+    headers,
+  });
+}
+function open(path) {
+  return post(path, { [TOKEN_HEADER]: TOKEN });
+}
 
 test("unmatched static paths are not served from the source tree", async () => {
   assert.equal((await get("/app/main.js")).status, 404);
@@ -33,10 +43,7 @@ test("a missing file, and the root directory, are both 404", async () => {
   assert.equal((await get("/")).status, 404);
 });
 
-/* ---------- the boundary ---------- */
-
-/* These four are the security contract. Anything on this machine can reach
-   loopback and read what comes back, so what may be read is the whole of it. */
+// Local processes can read loopback responses: the allowlist is the boundary.
 
 test("a plan nobody registered is refused, however readable it is", async () => {
   // 403 and not 404: the file is right there, and that is the point.
@@ -85,9 +92,7 @@ test("a plan is asked for by absolute path, and 404s once it is gone", async () 
   other.stop(true);
 });
 
-/* REVIEW_ROOT, for someone who wants a hard ceiling as well as the allowlist.
-   Unset by default: the allowlist is the boundary, and a default ceiling
-   would put back the "plans must live under one root" it replaces. */
+// REVIEW_ROOT adds an optional ceiling; without it, only the allowlist applies.
 test("a ceiling narrows what may be registered", async () => {
   const bounded = serve({
     port: 0,

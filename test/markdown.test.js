@@ -2,12 +2,14 @@ import { test } from "bun:test";
 import assert from "node:assert/strict";
 import { markdown } from "../src/app/markdown.js";
 
-const comment = (over) => ({
-  section: "Design",
-  quote: "a quote",
-  body: "a note",
-  ...over,
-});
+function comment(over) {
+  return {
+    section: "Design",
+    quote: "a quote",
+    body: "a note",
+    ...over,
+  };
+}
 
 test("the header names the plan and counts the comments", () => {
   const out = markdown([comment()], "~/path/to/repo/.plans/x.html");

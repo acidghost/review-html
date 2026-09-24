@@ -1,6 +1,3 @@
-/* The state file is small enough to test directly, and it is the piece most
-   likely to be wrong in a way nobody notices. */
-
 import { afterEach, test } from "bun:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, statSync, writeFileSync } from "node:fs";
@@ -19,8 +16,7 @@ test("what was written comes back", () => {
   assert.deepEqual(read(FILE), state);
 });
 
-/* The token is the only secret this tool has, so the modes are the point of
-   the file, not a detail of it. */
+// The token must not be readable by other users.
 test("the file and its directory are readable only by their owner", () => {
   write({ pid: 42, port: 8422, token: "t" }, FILE);
   assert.equal(statSync(FILE).mode & 0o777, 0o600);

@@ -29,42 +29,39 @@ declare global {
   }
 }
 
-/* review.html is ours and fixed, so a missing id is a bug rather than a case
-   to handle. The type argument is only needed for the few elements read for
-   more than their `hidden`. */
-const $ = <T extends HTMLElement = HTMLElement>(id: string) =>
-  document.getElementById(id) as T;
+// Missing ids in our fixed HTML are programmer errors.
+function $<T extends HTMLElement = HTMLElement>(id: string) {
+  return document.getElementById(id) as T;
+}
 const iframe = $<HTMLIFrameElement>("plan");
 
-let doc: Document | null = null; // the plan's document, inside the iframe
-let comments: Comment[] = []; // kept sorted by `start`
-let headings: Heading[] = []; // for section breadcrumbs
-let planName = ""; // basename, all the File API reliably gives us
-let planPath = ""; // the path `just review` passed; empty for a dropped file
-let planLabel = ""; // planPath, or the basename when that is all we have
-let planText = ""; // body text as loaded; painting never alters it
+let doc: Document | null = null;
+let comments: Comment[] = [];
+let headings: Heading[] = [];
+let planName = "";
+let planPath = "";
+let planLabel = "";
+let planText = "";
 let planHash = "";
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let storageOk = true;
 let seq = 0;
-let active: string | null = null; // the comment highlighted on both sides
+let active: string | null = null;
 
-/* ---------- comments ---------- */
-
-// Orphans first: they need attention and have no place in the document.
-const sortComments = () =>
-  comments.sort(
+// Show orphans first, since they have no place in the document.
+function sortComments() {
+  return comments.sort(
     (a, b) => Number(!!b.orphan) - Number(!!a.orphan) || a.start - b.start,
   );
+}
 
-// Removing a focused textarea does not reliably fire blur, so an empty draft
-// can outlive the re-render that replaced it.
-const pruneEmpty = () => {
+// Removing a focused textarea may not fire blur to discard its empty draft.
+function pruneEmpty() {
   for (const c of comments.filter((x) => !x.body.trim())) unpaint(doc, c.id);
   comments = comments.filter((c) => c.body.trim());
-};
+}
 
-const addComment = () => {
+function addComment() {
   const sel = doc?.getSelection();
   if (!doc || !sel || sel.isCollapsed || !sel.rangeCount) return;
   const range = sel.getRangeAt(0);
@@ -101,11 +98,10 @@ const addComment = () => {
   );
   box?.focus();
   box?.scrollIntoView({ block: "nearest" });
-};
+}
 
-/* Focusing another card blurs this one, so this runs mid-focus(): drop the one
-   card instead of re-rendering, or focus lands on a dead node. */
-const dropEmpty = (id: string) => {
+// Avoid re-rendering mid-focus: focus would land on a detached card.
+function dropEmpty(id: string) {
   const c = comments.find((x) => x.id === id);
   if (!c || c.body.trim()) return;
   comments = comments.filter((x) => x.id !== id);
@@ -114,43 +110,41 @@ const dropEmpty = (id: string) => {
   $("none").hidden = comments.length > 0;
   refreshCount();
   queueSave();
-};
+}
 
-const deleteComment = (id: string) => {
+function deleteComment(id: string) {
   comments = comments.filter((x) => x.id !== id);
   unpaint(doc, id);
   if (active === id) active = null;
   render();
   queueSave();
-};
+}
 
-const discard = (doomed: Comment[]) => {
+function discard(doomed: Comment[]) {
   const ids = new Set(doomed.map((c) => c.id));
   for (const id of ids) unpaint(doc, id);
   comments = comments.filter((c) => !ids.has(c.id));
   if (active && ids.has(active)) active = null;
   render();
   queueSave();
-};
+}
 
-/* One confirm for the lot: emptying the sidebar is the one action here that
-   cannot be undone from the UI, and per-card confirms would not make it any
-   less so. */
-const clearComments = () => {
+// Clear all with one confirmation, not one per card.
+function clearComments() {
   const n = written().length;
   if (!n || !confirm(`Delete all ${n} comment${n === 1 ? "" : "s"}?`)) return;
   discard(comments);
-};
+}
 
-const clearOrphans = () => {
+function clearOrphans() {
   const lost = orphans();
   const n = lost.length;
   if (!n || !confirm(`Delete ${n} unanchored comment${n === 1 ? "" : "s"}?`))
     return;
   discard(lost);
-};
+}
 
-const setActive = (id: string | null) => {
+function setActive(id: string | null) {
   active = id;
   for (const card of $("cards").children) {
     card.classList.toggle("active", (card as HTMLElement).dataset.id === id);
@@ -159,32 +153,32 @@ const setActive = (id: string | null) => {
     []) {
     m.classList.toggle("active", m.dataset.comment === id);
   }
-};
+}
 
-const revealMark = (id: string) => {
+function revealMark(id: string) {
   setActive(id);
   doc
     ?.querySelector(`mark[data-comment="${id}"]`)
     ?.scrollIntoView({ block: "center", behavior: "smooth" });
-};
+}
 
-const focusCard = (id: string) => {
+function focusCard(id: string) {
   setActive(id);
   const card = document.querySelector<HTMLElement>(`.card[data-id="${id}"]`);
   if (!card) return;
   card.scrollIntoView({ block: "nearest", behavior: "smooth" });
   card.querySelector<HTMLTextAreaElement>("textarea")?.focus();
-};
+}
 
-const onPlanClick = (e: Event) => {
+function onPlanClick(e: Event) {
   // Optional call: clicks land on the document too, which has no closest().
   const mark = (e.target as Element).closest?.("mark[data-comment]");
   const id = mark?.getAttribute("data-comment");
   if (id) focusCard(id);
   else setActive(null);
-};
+}
 
-const render = () => {
+function render() {
   const cards = $("cards");
   cards.textContent = "";
   for (const c of comments) {
@@ -253,28 +247,30 @@ const render = () => {
   $("none").hidden = comments.length > 0;
   if (active) setActive(active);
   refreshCount();
-};
+}
 
-const written = () => comments.filter((c) => c.body.trim());
-const orphans = () => comments.filter((c) => c.orphan);
+function written() {
+  return comments.filter((c) => c.body.trim());
+}
+function orphans() {
+  return comments.filter((c) => c.orphan);
+}
 
-const note = (msg: string) => {
+function note(msg: string) {
   $("note").textContent = msg ? `· ${msg}` : "";
-};
+}
 
-const refreshCount = () => {
+function refreshCount() {
   const n = written().length;
   $("count").textContent = doc ? `${n} comment${n === 1 ? "" : "s"}` : "";
   $<HTMLButtonElement>("exportBtn").disabled = n === 0;
   $<HTMLButtonElement>("jsonBtn").disabled = n === 0;
   $<HTMLButtonElement>("clearBtn").disabled = n === 0;
   $<HTMLButtonElement>("orphanBtn").disabled = orphans().length === 0;
-};
+}
 
-/* ---------- re-anchoring ---------- */
-
-const restore = (saved: Review, exact = true) => {
-  if (!doc) return; // nothing to paint into until a plan has loaded
+function restore(saved: Review, exact = true) {
+  if (!doc) return;
   for (const c of comments) unpaint(doc, c.id);
 
   // Reviews saved before context was recorded carry neither field.
@@ -309,31 +305,33 @@ const restore = (saved: Review, exact = true) => {
       .filter(Boolean)
       .join(" · "),
   );
-};
+}
 
-/* ---------- storage ---------- */
+function currentKey() {
+  return keyFor(planPath || planName);
+}
 
-const currentKey = () => keyFor(planPath || planName);
+function snapshot(): Review {
+  return {
+    name: planName,
+    path: planPath,
+    hash: planHash,
+    savedAt: new Date().toISOString(),
+    comments: written().map(
+      ({ id, start, quote, prefix, suffix, section, body }) => ({
+        id,
+        start,
+        quote,
+        prefix,
+        suffix,
+        section,
+        body,
+      }),
+    ),
+  };
+}
 
-const snapshot = (): Review => ({
-  name: planName,
-  path: planPath,
-  hash: planHash,
-  savedAt: new Date().toISOString(),
-  comments: written().map(
-    ({ id, start, quote, prefix, suffix, section, body }) => ({
-      id,
-      start,
-      quote,
-      prefix,
-      suffix,
-      section,
-      body,
-    }),
-  ),
-});
-
-const persist = () => {
+function persist() {
   if (!storageOk || !planName) return;
   try {
     writeStore(localStorage, currentKey(), snapshot());
@@ -341,29 +339,31 @@ const persist = () => {
     storageOk = false;
     note("not saved: storage unavailable");
   }
-};
+}
 
-const queueSave = () => {
+function queueSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(persist, 400);
-};
+}
 
-const readSaved = () => {
+function readSaved() {
   try {
     return readStore(localStorage, currentKey(), planName);
   } catch {
     storageOk = false;
     return null;
   }
-};
+}
 
-/* ---------- export ---------- */
+function baseName() {
+  return planName.replace(/\.html?$/i, "");
+}
 
-const baseName = () => planName.replace(/\.html?$/i, "");
+function exportText() {
+  return markdown(written(), planLabel);
+}
 
-const exportText = () => markdown(written(), planLabel);
-
-const download = (text: string, name: string, type: string) => {
+function download(text: string, name: string, type: string) {
   const link = document.createElement("a");
   link.href = URL.createObjectURL(new Blob([text], { type }));
   link.download = name;
@@ -371,18 +371,18 @@ const download = (text: string, name: string, type: string) => {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-};
+}
 
-const saveJSON = () =>
-  download(
+function saveJSON() {
+  return download(
     JSON.stringify(snapshot(), null, 2),
     `${baseName()}.review.json`,
     "application/json",
   );
+}
 
-const importJSON = (text: string) => {
+function importJSON(text: string) {
   if (!doc) return note("open the plan first, then drop the review");
-  // The same optimistic claim store.ts makes; the check below is the real one.
   let data: Review;
   try {
     data = JSON.parse(text);
@@ -392,11 +392,10 @@ const importJSON = (text: string) => {
   if (!Array.isArray(data.comments)) return note("no comments in that file");
   restore(data);
   queueSave();
-};
+}
 
-/* The picker can put the file next to the plan, so Claude gets a path instead
-   of a paste. Chromium only; elsewhere this downloads. */
-const saveMarkdown = async () => {
+// Save next to the plan when the browser supports it; otherwise download.
+async function saveMarkdown() {
   const name = `${baseName()}.review.md`;
   if (window.showSaveFilePicker) {
     try {
@@ -420,9 +419,9 @@ const saveMarkdown = async () => {
   }
   download(exportText(), name, "text/markdown");
   $("status").textContent = `Downloaded ${name}`;
-};
+}
 
-const showExport = async () => {
+async function showExport() {
   const text = exportText();
   const md = $<HTMLTextAreaElement>("md");
   md.value = text;
@@ -440,15 +439,13 @@ const showExport = async () => {
   }
   $("status").textContent = ok ? "Copied to clipboard" : "Select and copy";
   if (!ok) md.select();
-};
+}
 
-/* ---------- selection ---------- */
-
-const hideAdd = () => {
+function hideAdd() {
   $("add").hidden = true;
-};
+}
 
-const onSelect = () => {
+function onSelect() {
   const sel = doc?.getSelection();
   if (!sel || sel.isCollapsed || !sel.rangeCount) return hideAdd();
 
@@ -462,15 +459,13 @@ const onSelect = () => {
   const above = frame.top + box.top - add.offsetHeight - 6;
   add.style.top = `${above > frame.top ? above : frame.top + box.bottom + 6}px`;
   add.style.left = `${Math.min(frame.left + box.left, frame.right - add.offsetWidth - 8)}px`;
-};
+}
 
-/* ---------- loading ---------- */
+let planStyles = ""; // read once at boot to keep loadPlan synchronous
 
-let planStyles = ""; // read once at boot, so loadPlan stays synchronous
-
-const loadPlan = (html: string, name: string, label = "") => {
-  planName = name; // basename: names the downloads, and the weak match key
-  planPath = label; // the stable storage key; empty for a dropped file
+function loadPlan(html: string, name: string, label = "") {
+  planName = name;
+  planPath = label;
   planLabel = label || name;
   comments = [];
   seq = 0;
@@ -482,7 +477,7 @@ const loadPlan = (html: string, name: string, label = "") => {
     try {
       loaded = iframe.contentDocument;
     } catch {
-      // Some browsers throw here rather than handing back null.
+      // Some browsers throw instead of returning null.
     }
     if (!loaded) {
       fail(
@@ -498,7 +493,7 @@ const loadPlan = (html: string, name: string, label = "") => {
     for (const s of doc.querySelectorAll("script")) s.remove();
     doc.querySelector("#width")?.remove();
 
-    // Text, not a <link>: srcdoc has no useful base URL of its own.
+    // srcdoc has no useful base URL for a stylesheet link.
     const style = doc.createElement("style");
     style.textContent = planStyles;
     doc.head.append(style);
@@ -527,9 +522,9 @@ const loadPlan = (html: string, name: string, label = "") => {
   };
 
   iframe.srcdoc = html;
-};
+}
 
-const fail = (title: string, detail: string) => {
+function fail(title: string, detail: string) {
   const empty = $("empty");
   empty.textContent = "";
   const heading = document.createElement("b");
@@ -538,9 +533,9 @@ const fail = (title: string, detail: string) => {
   sub.textContent = detail;
   empty.append(heading, sub);
   empty.hidden = false;
-};
+}
 
-const openFile = (file: File | undefined) => {
+function openFile(file: File | undefined) {
   if (!file) return;
   const isReview = /\.json$/i.test(file.name);
   const reader = new FileReader();
@@ -550,11 +545,10 @@ const openFile = (file: File | undefined) => {
     else loadPlan(text, file.name);
   };
   reader.readAsText(file);
-};
+}
 
-/* ---------- wiring ---------- */
-
-$("add").addEventListener("mousedown", (e) => e.preventDefault()); // keep the selection
+// Keep the selection while clicking Add.
+$("add").addEventListener("mousedown", (e) => e.preventDefault());
 $("add").addEventListener("click", addComment);
 $("openBtn").addEventListener("click", () => $("file").click());
 $("file").addEventListener("change", (e) =>
@@ -605,9 +599,7 @@ const reviewer = {
   comments: () => comments,
 };
 
-/* Served mode: fetch the plan named in the query string. One absolute path,
-   read back through the server's /plan route. */
-const boot = async () => {
+async function boot() {
   planStyles = await planCss();
   // Only now, so `window.reviewer` appearing means a plan can be loaded.
   window.reviewer = reviewer;
@@ -626,5 +618,5 @@ const boot = async () => {
       `${(err as Error).message} — is \`just serve\` running?`,
     );
   }
-};
+}
 boot();

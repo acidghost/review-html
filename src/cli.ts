@@ -1,6 +1,4 @@
 #!/usr/bin/env bun
-/* The CLI and executable entry point. Bun's HTML-aware import in server.ts
-   brings the reviewer and its browser assets into the compiled binary. */
 
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
@@ -21,35 +19,31 @@ review-html status   what is running, and which plans it will serve
 
 Subcommands win the bare word: a plan named "serve" is reachable as ./serve.`;
 
-/* The reviewer's URL. The plan is one absolute path, which the browser
-   shortens for the header itself. */
-export const reviewUrl = ({ plan = "", port = PORT } = {}) => {
+export function reviewUrl({ plan = "", port = PORT } = {}) {
   const url = new URL(`http://127.0.0.1:${port}/review.html`);
   if (plan) url.searchParams.set("plan", plan);
   return url.href;
-};
+}
 
-/* How to run ourselves again. In development Bun needs the script named;
-   compiled, the executable starts itself with the requested command. */
-const selfCommand = () => {
+// Bun needs the script in development; the compiled executable does not.
+function selfCommand() {
   const source = join(import.meta.dir, "cli.ts");
   return existsSync(source)
     ? [process.execPath, "run", source]
     : [process.execPath];
-};
+}
 
-const refuseDifferentTrackedPort = (port: number) => {
+function refuseDifferentTrackedPort(port: number) {
   const existing = state.read();
   if (existing && existing.port !== port) {
     throw new Error(
       `review-html already tracks a server on port ${existing.port}; stop it before serving on ${port}`,
     );
   }
-};
+}
 
-/* Returns whether it had to start one. Detached, so the shell comes back and
-   `review-html stop` is what ends the server. */
-const ensureServing = async (port: number) => {
+// Start detached; `review-html stop` ends the server.
+async function ensureServing(port: number) {
   const found = await ping(port);
   if (found === "ours") return false;
   if (found === "foreign") {
@@ -61,16 +55,15 @@ const ensureServing = async (port: number) => {
     stdio: ["ignore", "ignore", "ignore"],
   }).unref();
 
-  // Polling rather than a flat sleep: it is usually listening within 100ms.
   const deadline = Date.now() + 5000;
   while (Date.now() < deadline) {
     if ((await ping(port)) === "ours") return true;
     await Bun.sleep(100);
   }
   throw new Error(`no answer from the server started on port ${port}`);
-};
+}
 
-const withToken = (port: number, path: string, init?: RequestInit) => {
+function withToken(port: number, path: string, init?: RequestInit) {
   const recorded = state.read();
   if (!recorded?.token) {
     throw new Error(
@@ -86,22 +79,25 @@ const withToken = (port: number, path: string, init?: RequestInit) => {
     ...init,
     headers: { ...init?.headers, [TOKEN_HEADER]: recorded.token },
   });
-};
+}
 
 type ServerStatus = { pid: number; port: number; plans: string[] };
 
-const isServerStatus = (value: unknown): value is ServerStatus =>
-  typeof value === "object" &&
-  value !== null &&
-  "pid" in value &&
-  typeof value.pid === "number" &&
-  "port" in value &&
-  typeof value.port === "number" &&
-  "plans" in value &&
-  Array.isArray(value.plans) &&
-  value.plans.every((plan) => typeof plan === "string");
+function isServerStatus(value: unknown): value is ServerStatus {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "pid" in value &&
+    typeof value.pid === "number" &&
+    "port" in value &&
+    typeof value.port === "number" &&
+    "plans" in value &&
+    Array.isArray(value.plans) &&
+    value.plans.every((plan) => typeof plan === "string")
+  );
+}
 
-const readStatus = async (port: number) => {
+async function readStatus(port: number) {
   const res = await withToken(port, "/_status");
   if (!res.ok) throw new Error(await res.text());
   const value: unknown = await res.json();
@@ -109,9 +105,9 @@ const readStatus = async (port: number) => {
     throw new Error(`invalid server status response from port ${port}`);
   }
   return value;
-};
+}
 
-const clearIfCurrent = (expected: state.State) => {
+function clearIfCurrent(expected: state.State) {
   const current = state.read();
   if (
     current?.pid === expected.pid &&
@@ -120,22 +116,20 @@ const clearIfCurrent = (expected: state.State) => {
   ) {
     state.clear();
   }
-};
+}
 
-/* The server serves nothing it was not handed, so this is what makes a plan
-   readable — and the only reason a plan may live anywhere at all. */
-const register = async (plan: string, port: number) => {
+// Only authenticated registration makes a plan readable.
+async function register(plan: string, port: number) {
   const res = await withToken(port, "/_open", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ path: plan }),
   });
   if (!res.ok) throw new Error(await res.text());
-};
+}
 
-const openPlan = async (plan: string, port: number) => {
-  // Relative to where it was typed, which is the point of resolving it here
-  // rather than in the server.
+async function openPlan(plan: string, port: number) {
+  // Resolve against the CLI caller's directory, not the server's.
   const file = plan ? resolve(plan) : "";
   if (file && !(await Bun.file(file).exists())) {
     throw new Error(`no such plan: ${plan}`);
@@ -148,9 +142,9 @@ const openPlan = async (plan: string, port: number) => {
   }
   if (file) await register(file, port);
   Bun.spawn(["open", reviewUrl({ plan: file, port })]).unref();
-};
+}
 
-const serveHere = (port: number, ceiling: string) => {
+function serveHere(port: number, ceiling: string) {
   refuseDifferentTrackedPort(port);
 
   const recorded = { pid: process.pid, port, token: randomUUID() };
@@ -170,9 +164,9 @@ const serveHere = (port: number, ceiling: string) => {
       process.exit(0);
     });
   }
-};
+}
 
-const stop = async (port: number) => {
+async function stop(port: number) {
   const recorded = state.read();
   if (recorded && recorded.port !== port) {
     throw new Error(
@@ -181,7 +175,6 @@ const stop = async (port: number) => {
   }
 
   if ((await ping(port)) !== "ours") {
-    // A file left behind by a server that was killed is not a failure.
     if (recorded) clearIfCurrent(recorded);
     else state.clear();
     console.log(
@@ -217,9 +210,9 @@ const stop = async (port: number) => {
     await Bun.sleep(100);
   }
   throw new Error(`server ${recorded.pid} is still answering on ${port}`);
-};
+}
 
-const status = async (port: number) => {
+async function status(port: number) {
   const recorded = state.read();
   if (recorded && recorded.port !== port) {
     console.log(
@@ -245,14 +238,14 @@ const status = async (port: number) => {
   console.log(`serving on 127.0.0.1:${port}, pid ${current.pid}`);
   for (const plan of current.plans) console.log(`  ${plan}`);
   if (!current.plans.length) console.log("  no plans open for review");
-};
+}
 
-/* --port wins; otherwise a recorded server's port, so stop and status find
-   one that was started on something other than the default. */
-const recordedPort = (given: string | undefined) =>
-  given ? Number(given) : (state.read()?.port ?? PORT);
+// Stop/status use the recorded port unless --port overrides it.
+function recordedPort(given: string | undefined) {
+  return given ? Number(given) : (state.read()?.port ?? PORT);
+}
 
-export const main = async () => {
+export async function main() {
   const { values, positionals } = parseArgs({
     options: {
       port: { type: "string" },
@@ -277,6 +270,6 @@ export const main = async () => {
     console.error((err as Error).message);
     process.exit(1);
   }
-};
+}
 
 if (import.meta.main) await main();
